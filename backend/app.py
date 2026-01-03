@@ -6,14 +6,13 @@ from routes.course_routes import course_bp
 from routes.learn_routes import learn_bp
 from routes.instructor_routes import instructor_bp
 from routes.ai_routes import ai_bp
-
-
+from routes.achievement_routes import achievement_bp
 
 def create_app():
     app = Flask(__name__)
     
     # 1. CORS Setup (Allow Frontend to connect)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, resources={r"/api/*": {"origins": ["*","http://10.121.245.240:5173/", "https://10.121.245.240:5173/"]}})
 
     # 2. Initialize Firebase
     try:
@@ -24,10 +23,11 @@ def create_app():
 
     # 3. Register Blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(course_bp, url_prefix='/api/courses')
+    app.register_blueprint(course_bp, url_prefix='/api/course')
     app.register_blueprint(learn_bp, url_prefix='/api/learn')
     app.register_blueprint(instructor_bp, url_prefix='/api/instructor')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(achievement_bp, url_prefix='/api/achievements')
 
     # 4. Health Check
     @app.route('/')
@@ -38,4 +38,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
