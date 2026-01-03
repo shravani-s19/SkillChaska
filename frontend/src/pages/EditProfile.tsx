@@ -1,26 +1,88 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Camera, Save, ChevronLeft, User, Mail, Globe, Github, Twitter } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, Save, ChevronLeft, User, Mail, Globe, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { USER_DATA } from '../data/mockData';
+import { useAuthStore } from '../store/useAuthStore';
+import { authService } from '../services/auth.service';
 
 const EditProfile = () => {
   const navigate = useNavigate();
+  const { user, login } = useAuthStore(); // We use login to update the local store with new data
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: USER_DATA.student_full_name,
-    email: USER_DATA.student_email,
-    bio: "Passionate developer learning AI and Python patterns.",
-    website: "https://rahul.dev",
-    github: "rahulsharma",
-    twitter: "rahul_dev"
+    fullName: '',
+    email: '',
+    bio: '',
+    website: '',
+    github: ''
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  // Load User Data into Form
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        fullName: user.student_full_name || '',
+        email: user.student_email || '',
+        bio: user.student_bio || '',
+        website: user.student_website || '',
+        github: user.student_social_github || ''
+      });
+    }
+  }, [user]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate save
-    alert("Profile updated successfully!");
-    navigate('/profile');
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      // Call API
+      await authService.updateProfile({
+        student_full_name: formData.fullName,
+        student_email: formData.email,
+        student_bio: formData.bio,
+        student_website: formData.website,
+        student_social_github: formData.github
+      });
+
+      // Update Local Store (Simulating re-login to refresh state)
+      // In a real app, updateStore(updatedUser) is better
+      const token = localStorage.getItem('jwt_token');
+      if (token) login(token); 
+      
+      alert("Profile updated successfully!");
+      navigate('/profile');
+    } catch (error) {
+      console.error("Update failed", error);
+      alert("Failed to update profile. API might be missing.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setIsLoading(true);
+      try {
+        const file = e.target.files[0];
+        await authService.uploadAvatar(file);
+        
+        // Refresh profile to get new avatar
+        const token = localStorage.getItem('jwt_token');
+        if (token) login(token);
+
+        alert("Avatar updated!");
+      } catch (error) {
+        console.error("Avatar upload failed", error);
+        alert("Failed to upload avatar. API might be missing.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  if (!user) return <div className="p-8">Loading...</div>;
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -38,11 +100,22 @@ const EditProfile = () => {
           <div className="flex items-center gap-8">
             <div className="relative group">
               <img 
-                src={USER_DATA.student_avatar_url} 
+                src={user.student_avatar_url || "https://ui-avatars.com/api/?name=" + user.student_full_name} 
                 alt="Avatar" 
                 className="w-32 h-32 rounded-3xl object-cover border-4 border-white/5"
               />
-              <button type="button" className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleAvatarUpload}
+              />
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
                 <Camera className="w-8 h-8 text-white" />
               </button>
             </div>
@@ -50,8 +123,13 @@ const EditProfile = () => {
               <h3 className="text-xl font-bold mb-2">Profile Picture</h3>
               <p className="text-textSecondary text-sm mb-4">PNG, JPG or GIF. Max size of 800K</p>
               <div className="flex gap-3">
-                <button type="button" className="px-4 py-2 bg-secondary text-white rounded-xl text-sm font-bold">Upload New</button>
-                <button type="button" className="px-4 py-2 bg-white/5 text-text rounded-xl text-sm font-bold hover:bg-white/10">Remove</button>
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-secondary text-white rounded-xl text-sm font-bold"
+                >
+                  Upload New
+                </button>
               </div>
             </div>
           </div>
@@ -134,10 +212,11 @@ const EditProfile = () => {
           </button>
           <button 
             type="submit"
-            className="px-8 py-4 bg-secondary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-secondary/20"
+            disabled={isLoading}
+            className="px-8 py-4 bg-secondary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-secondary/20 disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
-            Save Changes
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>

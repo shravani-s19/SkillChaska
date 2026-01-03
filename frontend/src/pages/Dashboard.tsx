@@ -1,4 +1,6 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { courseService } from '../services/course.service';
 import { motion } from 'framer-motion';
 import { 
   Zap, 
@@ -12,10 +14,31 @@ import {
 } from 'lucide-react';
 import { CourseCard } from '../components/Dashboard/CourseCard';
 import { StatsCard } from '../components/Dashboard/StatsCard';
-import { ENROLLED_COURSES, USER_DATA } from '../data/mockData';
+import { CourseEntity } from '../types';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
+  const { user } = useAuthStore();
+  const [courses, setCourses] = useState<CourseEntity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        // Fetch real courses from API
+        const data = await courseService.getAll();
+        setCourses(data as CourseEntity[]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  if (!user || loading) return <div>Loading...</div>;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -25,7 +48,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, x: 0 }}
             className="text-4xl font-bold mb-2"
           >
-            Welcome back, {USER_DATA.student_full_name.split(' ')[0]}! 👋
+            Welcome back, {user.student_full_name.split(' ')[0]}! 👋
           </motion.h1>
           <p className="text-textSecondary">You've completed 14 modules this month. Keep it up!</p>
         </div>
@@ -42,28 +65,28 @@ const Dashboard = () => {
         <StatsCard 
           icon={Zap} 
           label="Current Streak" 
-          value={`${USER_DATA.student_stats.stat_days_streak} Days`} 
+          value={`${user.student_stats.stat_days_streak} Days`} 
           trend="+2 from last week"
           color="text-accent"
         />
         <StatsCard 
           icon={Clock} 
           label="Hours Learned" 
-          value={`${USER_DATA.student_stats.stat_total_watch_time_hours}h`} 
+          value={`${user.student_stats.stat_total_watch_time_hours}h`} 
           trend="Top 5% of students"
           color="text-secondary"
         />
         <StatsCard 
           icon={Trophy} 
           label="Certificates" 
-          value={USER_DATA.student_stats.stat_certificates_earned.length.toString()} 
+          value={user.student_stats.stat_certificates_earned.length.toString()} 
           trend="1 pending review"
           color="text-success"
         />
         <StatsCard 
           icon={TrendingUp} 
           label="Total XP" 
-          value={USER_DATA.student_stats.stat_total_xp.toLocaleString()} 
+          value={user.student_stats.stat_total_xp.toLocaleString()} 
           trend="Level 12 Architect"
           color="text-purple-500"
         />
@@ -80,11 +103,11 @@ const Dashboard = () => {
                 Continue Learning
               </h2>
             </div>
-            <Link to="/classroom/python-101" className="block group">
+            <Link to="/classroom/course_b86c399e" className="block group">
               <div className="relative rounded-[2rem] overflow-hidden bg-surface border border-white/5 p-8 flex flex-col md:flex-row items-center gap-8 transition-all hover:border-secondary/50 hover:shadow-2xl hover:shadow-secondary/10">
                 <div className="w-full md:w-48 aspect-video rounded-2xl overflow-hidden relative">
                   <img 
-                    src={ENROLLED_COURSES[0].thumbnail} 
+                    src={courses?.[0]?.course_thumbnail_url} 
                     alt="Course" 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
@@ -98,11 +121,11 @@ const Dashboard = () => {
                     <div className="w-1 h-1 bg-textSecondary rounded-full" />
                     <span className="text-xs text-textSecondary">22 mins remaining</span>
                   </div>
-                  <h3 className="text-2xl font-bold mb-4 group-hover:text-secondary transition-colors">{ENROLLED_COURSES[0].title}</h3>
+                  <h3 className="text-2xl font-bold mb-4 group-hover:text-secondary transition-colors">{courses?.[0]?.course_title}</h3>
                   <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${ENROLLED_COURSES[0].progress}%` }}
+                      animate={{ width: `${courses?.[0]?.course_progress}%` }}
                       className="h-full bg-secondary"
                     />
                   </div>
@@ -124,8 +147,8 @@ const Dashboard = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {ENROLLED_COURSES.map((course) => (
-                <CourseCard key={course.id} course={course} />
+              {courses?.map((course) => (
+                <CourseCard key={course.course_id} course={course} />
               ))}
             </div>
           </section>

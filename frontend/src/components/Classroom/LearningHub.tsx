@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Brain, Lightbulb, Download, GitGraph, Layers } from 'lucide-react';
+import { 
+  FileText, Brain, Lightbulb, Download, 
+  GitGraph, Layers, Link as LinkIcon, FileCode, FileArchive 
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { COURSE_DETAILS } from '../../data/mockData';
+import { useProgressStore } from '../../store/useProgressStore';
+import { learnService } from '../../services/learn.service';
+import { ModuleMaterialsResponse, MindMapNode as MindMapNodeType, Flashcard as FlashcardType } from '../../types';
 
 const TABS = [
   { id: 'notes', label: 'Smart Notes', icon: FileText },
@@ -10,7 +15,18 @@ const TABS = [
   { id: 'resources', label: 'Resources', icon: Lightbulb },
 ];
 
-const FlashCard = ({ card }: { card: { front: string; back: string } }) => {
+// Helper to map string types to Icons
+const getIconForType = (type: string) => {
+  switch (type) {
+    case 'pdf': return FileText;
+    case 'code': return FileCode;
+    case 'zip': return FileArchive;
+    case 'link': return LinkIcon;
+    default: return FileText;
+  }
+};
+
+const FlashCard = ({ card }: { card: FlashcardType }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   return (
@@ -29,21 +45,21 @@ const FlashCard = ({ card }: { card: { front: string; back: string } }) => {
           <div className="w-8 h-8 bg-secondary/10 rounded-full flex items-center justify-center mb-3">
             <span className="text-secondary font-bold text-lg">?</span>
           </div>
-          <h4 className="font-bold text-lg">{card.front}</h4>
+          <h4 className="font-bold text-lg">{card.front_text}</h4>
           <p className="text-xs text-textSecondary mt-4">Click to flip</p>
         </div>
 
         {/* Back */}
         <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary/10 border border-secondary/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-lg">
-          <h4 className="font-medium text-sm leading-relaxed">{card.back}</h4>
+          <h4 className="font-medium text-sm leading-relaxed">{card.back_text}</h4>
         </div>
       </motion.div>
     </div>
   );
 };
 
-// Simple recursive component to render Mind Map nodes
-const MindMapNode = ({ node, depth = 0 }: { node: any, depth?: number }) => (
+// Recursive Mind Map Node
+const MindMapNode = ({ node, depth = 0 }: { node: MindMapNodeType, depth?: number }) => (
   <div className="flex flex-col items-center">
     <div className={cn(
       "px-4 py-2 rounded-xl border font-bold text-sm mb-4 relative z-10 transition-all hover:scale-105",
@@ -53,13 +69,13 @@ const MindMapNode = ({ node, depth = 0 }: { node: any, depth?: number }) => (
     )}>
       {node.label}
     </div>
-    {node.children && (
+    {node.children && node.children.length > 0 && (
       <div className="flex gap-4 relative">
         {/* Connector Lines (Visual Only) */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-4 bg-white/10 -mt-4" />
         <div className="absolute top-0 left-4 right-4 h-px bg-white/10 -mt-4" />
         
-        {node.children.map((child: any) => (
+        {node.children.map((child) => (
           <div key={child.id} className="pt-4 relative">
              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-4 bg-white/10 -mt-4" />
             <MindMapNode node={child} depth={depth + 1} />
@@ -73,7 +89,49 @@ const MindMapNode = ({ node, depth = 0 }: { node: any, depth?: number }) => (
 export const LearningHub = () => {
   const [activeTab, setActiveTab] = useState('notes');
   const [revisionMode, setRevisionMode] = useState<'flashcards' | 'mindmap'>('mindmap');
-  const data = COURSE_DETAILS.course_modules[0];
+  
+  // State for fetched data
+  const [materials, setMaterials] = useState<ModuleMaterialsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Store
+  const { activeCourseId, activeModuleId } = useProgressStore();
+
+  useEffect(() => {
+    if (activeCourseId && activeModuleId) {
+      const fetchMaterials = async () => {
+        setIsLoading(true);
+        try {
+          const data = await learnService.getModuleMaterials(activeCourseId, activeModuleId);
+          setMaterials(data);
+        } catch (error) {
+          console.error("Failed to load learning materials", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchMaterials();
+    }
+  }, [activeCourseId, activeModuleId]);
+
+  if (isLoading) {
+    return (
+      <div className="mt-8 bg-surface border border-border rounded-3xl h-[600px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-6 h-6 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-textSecondary">Loading AI Materials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!materials) {
+     return (
+       <div className="mt-8 bg-surface border border-border rounded-3xl h-[600px] flex items-center justify-center">
+         <p className="text-textSecondary">No additional materials available for this module.</p>
+       </div>
+     );
+  }
 
   return (
     <div className="mt-8 bg-surface border border-border rounded-3xl overflow-hidden flex flex-col h-[600px]">
@@ -110,16 +168,20 @@ export const LearningHub = () => {
               </button>
             </div>
             <div className="space-y-4">
-              {data.ai_smart_notes.map((note, i) => (
-                <div key={i} className="flex gap-4 group p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
-                  <span className="text-xs font-mono text-secondary bg-secondary/10 px-2 py-1 rounded h-fit">
-                    {note.time}
-                  </span>
-                  <p className="text-sm text-textSecondary leading-relaxed group-hover:text-text transition-colors">
-                    {note.text}
-                  </p>
-                </div>
-              ))}
+              {materials.ai_smart_notes.length > 0 ? (
+                materials.ai_smart_notes.map((note) => (
+                  <div key={note.note_id} className="flex gap-4 group p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                    <span className="text-xs font-mono text-secondary bg-secondary/10 px-2 py-1 rounded h-fit whitespace-nowrap">
+                      {note.formatted_time}
+                    </span>
+                    <p className="text-sm text-textSecondary leading-relaxed group-hover:text-text transition-colors">
+                      {note.note_text}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-textSecondary text-sm italic">No AI notes generated yet.</p>
+              )}
             </div>
           </div>
         )}
@@ -149,15 +211,19 @@ export const LearningHub = () => {
 
             <div className="flex-1 flex items-center justify-center min-h-[300px]">
               {revisionMode === 'mindmap' ? (
-                <div className="w-full overflow-x-auto pb-4 text-center">
-                  <MindMapNode node={data.ai_revision.mind_map} />
-                </div>
+                materials.ai_mind_map ? (
+                  <div className="w-full overflow-x-auto pb-4 text-center">
+                    <MindMapNode node={materials.ai_mind_map} />
+                  </div>
+                ) : <p className="text-textSecondary text-sm">Mind map not available.</p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                  {data.ai_revision.flashcards.map((card) => (
-                    <FlashCard key={card.id} card={card} />
-                  ))}
-                </div>
+                materials.ai_flashcards.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                    {materials.ai_flashcards.map((card) => (
+                      <FlashCard key={card.card_id} card={card} />
+                    ))}
+                  </div>
+                ) : <p className="text-textSecondary text-sm">No flashcards available.</p>
               )}
             </div>
           </div>
@@ -165,20 +231,33 @@ export const LearningHub = () => {
 
         {activeTab === 'resources' && (
           <div className="space-y-3">
-            {data.resources.map((res, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-surface rounded-xl flex items-center justify-center text-textSecondary group-hover:text-secondary transition-colors">
-                    <res.icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-bold block mb-0.5">{res.name}</span>
-                    <span className="text-xs text-textSecondary">{res.type} • {res.size}</span>
-                  </div>
-                </div>
-                <Download className="w-4 h-4 text-textSecondary group-hover:text-text transition-colors" />
-              </div>
-            ))}
+            {materials.module_resources.length > 0 ? (
+              materials.module_resources.map((res) => {
+                const Icon = getIconForType(res.resource_type);
+                return (
+                  <a 
+                    key={res.resource_id} 
+                    href={res.resource_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-surface rounded-xl flex items-center justify-center text-textSecondary group-hover:text-secondary transition-colors">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-bold block mb-0.5">{res.resource_name}</span>
+                        <span className="text-xs text-textSecondary uppercase">{res.resource_type} {res.resource_size && `• ${res.resource_size}`}</span>
+                      </div>
+                    </div>
+                    <Download className="w-4 h-4 text-textSecondary group-hover:text-text transition-colors" />
+                  </a>
+                );
+              })
+            ) : (
+              <p className="text-textSecondary text-sm italic">No downloadable resources.</p>
+            )}
           </div>
         )}
       </div>

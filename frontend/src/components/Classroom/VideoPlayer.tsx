@@ -1,27 +1,41 @@
+// File: src/components/Classroom/VideoPlayer.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Volume2, VolumeX, Settings, Maximize, 
   RotateCcw, CheckCircle2, XCircle, AlertCircle 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../../services/api';
+
+// Services & Utils
+import { learnService } from '../../services/learn.service';
 import { cn } from '../../lib/utils';
-import { COURSE_DETAILS } from '../../data/mockData';
 import { useProgressStore } from '../../store/useProgressStore';
+import { InteractionPoint } from '../../types';
 
 interface VideoPlayerProps {
   moduleId: string;
   courseId: string;
-  initialStartTime?: number; // Passed from store
+  videoUrl: string; // New Prop: Real Signed URL
+  interactionPoints: InteractionPoint[]; // New Prop: Real Interaction Data
+  initialStartTime?: number;
   onComplete?: () => void;
   onTimeUpdate?: (time: number) => void;
 }
 
-export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComplete, onTimeUpdate }: VideoPlayerProps) => {
-  // Store Action
+export const VideoPlayer = ({ 
+  moduleId, 
+  courseId, 
+  videoUrl,
+  interactionPoints,
+  initialStartTime = 0, 
+  onComplete, 
+  onTimeUpdate 
+}: VideoPlayerProps) => {
+  
+  // Store Action (Handles Optimistic UI + Backend Heartbeat)
   const updateVideoProgress = useProgressStore(state => state.updateVideoProgress);
 
-  // State
+  // Player State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -36,7 +50,7 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
   const [isReady, setIsReady] = useState(false);
 
   // Quiz State
-  const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
+  const [activeQuiz, setActiveQuiz] = useState<InteractionPoint | null>(null);
   const [quizCompletedIds, setQuizCompletedIds] = useState<Set<string>>(new Set());
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [quizFeedback, setQuizFeedback] = useState<{isCorrect: boolean, msg: string} | null>(null);
@@ -44,27 +58,23 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Get Module Data (In real app, fetch based on ID)
-  // We use find because currently COURSE_DETAILS is one course
-  const moduleData = COURSE_DETAILS.course_modules.find(m => m.module_id === moduleId);
 
   // 1. Handle Initial Resume Logic
   useEffect(() => {
     const video = videoRef.current;
-    if (video && !isReady && moduleData) {
+    if (video && !isReady && videoUrl) {
       // Set the video time to where they left off
       video.currentTime = initialStartTime;
       setCurrentTime(initialStartTime);
       setMaxWatchedTime(initialStartTime);
       setIsReady(true);
     }
-  }, [initialStartTime, moduleData, isReady]);
+  }, [initialStartTime, videoUrl, isReady]);
 
   // 2. Handle Time Update & Checkpoints
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !moduleData) return;
+    if (!video) return;
 
     const handleTimeUpdate = () => {
       const time = video.currentTime;
@@ -78,12 +88,13 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
 
       // Checkpoint Save (Every 5 seconds approx)
       if (Math.floor(time) % 5 === 0) {
-        updateVideoProgress(courseId, time);
+        // This action now calls learnService.sendHeartbeat internally in the store
+        updateVideoProgress(courseId, moduleId, time);
       }
 
-      // Interaction Points
-      const interaction = moduleData.module_ai_interaction_points.find(
-        p => Math.floor(time) === p.timestamp && !quizCompletedIds.has(p.id)
+      // Interaction Points Logic (Quiz Trigger)
+      const interaction = interactionPoints.find(
+        p => Math.floor(time) === p.interaction_timestamp_seconds && !quizCompletedIds.has(p.interaction_id)
       );
 
       if (interaction && !activeQuiz) {
@@ -104,7 +115,7 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
     };
 
     const handleEnded = () => {
-      updateVideoProgress(courseId, duration); // Save 100% progress
+      updateVideoProgress(courseId, moduleId, duration); 
       onComplete?.();
     };
 
@@ -121,7 +132,7 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [maxWatchedTime, activeQuiz, quizCompletedIds, onComplete, moduleData, courseId, updateVideoProgress, duration, onTimeUpdate]);
+  }, [maxWatchedTime, activeQuiz, quizCompletedIds, onComplete, interactionPoints, courseId, moduleId, updateVideoProgress, duration, onTimeUpdate]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -153,29 +164,36 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
     }
   };
 
+  // 3. Quiz Handling with Real API
   const handleQuizSubmit = async () => {
     if (!selectedOption || !activeQuiz) return;
     setIsValidating(true);
 
-    const result = await api.learn.validateAnswer({
-      module_id: moduleId,
-      interaction_id: activeQuiz.id,
-      selected_option: selectedOption
-    });
+    try {
+      const result = await learnService.validateAnswer(
+        moduleId,
+        activeQuiz.interaction_id,
+        selectedOption
+      );
 
-    setQuizFeedback({ isCorrect: result.is_correct, msg: result.feedback });
-    setIsValidating(false);
+      setQuizFeedback({ isCorrect: result.is_correct, msg: result.feedback });
+      setIsValidating(false);
 
-    if (result.is_correct) {
-      // Auto continue after short delay if correct
-      setTimeout(() => {
-        setQuizCompletedIds(prev => new Set(prev).add(activeQuiz.id));
-        setActiveQuiz(null);
-        setQuizFeedback(null);
-        setSelectedOption(null);
-        videoRef.current?.play();
-        setIsPlaying(true);
-      }, 1500);
+      if (result.is_correct) {
+        // Auto continue after short delay if correct
+        setTimeout(() => {
+          setQuizCompletedIds(prev => new Set(prev).add(activeQuiz.interaction_id));
+          setActiveQuiz(null);
+          setQuizFeedback(null);
+          setSelectedOption(null);
+          videoRef.current?.play();
+          setIsPlaying(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Quiz Validation Error", error);
+      setIsValidating(false);
+      setQuizFeedback({ isCorrect: false, msg: "Failed to validate answer. Please try again." });
     }
   };
 
@@ -192,7 +210,7 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
     >
       <video 
         ref={videoRef}
-        src={moduleData?.video_url}
+        src={videoUrl}
         className="w-full h-full object-cover"
         onClick={togglePlay}
         playsInline
@@ -234,10 +252,11 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
                 <span className="text-secondary text-xs font-bold uppercase tracking-widest">Interaction Point</span>
               </div>
               
-              <h3 className="text-xl font-bold mb-6 relative">{activeQuiz.question}</h3>
+              {/* Updated: Use Real API fields */}
+              <h3 className="text-xl font-bold mb-6 relative">{activeQuiz.interaction_question_text}</h3>
               
               <div className="space-y-3 mb-8 relative">
-                {activeQuiz.options.map((option: string) => (
+                {activeQuiz.interaction_options_list.map((option: string) => (
                   <button
                     key={option}
                     onClick={() => !quizFeedback?.isCorrect && setSelectedOption(option)}
@@ -317,8 +336,6 @@ export const VideoPlayer = ({ moduleId, courseId, initialStartTime = 0, onComple
           >
             <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/progress:scale-100 transition-transform z-10" />
           </div>
-          
-          {/* Tooltip for interaction points could go here */}
         </div>
 
         <div className="flex items-center justify-between">

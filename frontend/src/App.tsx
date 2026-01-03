@@ -13,100 +13,137 @@ import CourseCompletion from "./pages/CourseCompletion";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
 import Subscription from "./pages/Subscription";
+import Login from "./pages/Login"; // <--- Import Login
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthGuard } from "./components/AuthGuard";
+import CourseEnrollment from "./pages/CourseEnrollment";
 
 function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AuthGuard>
-          <div className="flex min-h-screen bg-background text-text font-sans transition-colors duration-300">
-            <Routes>
-              {/* Layout with Sidebar */}
-              <Route
-                path="/dashboard"
-                element={
+        <div className="flex min-h-screen bg-background text-text font-sans transition-colors duration-300">
+          <Routes>
+            {/* Public Route */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <Dashboard />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              <Route
-                path="/courses"
-                element={
+            <Route
+              path="/courses"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <Courses />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              <Route
-                path="/achievements"
-                element={
+            <Route
+              path="/enroll/:id"
+              element={
+                <AuthGuard>
+                  <CourseEnrollment />
+                </AuthGuard>
+              }
+            />
+
+            <Route
+              path="/achievements"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <Achievements />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              <Route
-                path="/profile"
-                element={
+            <Route
+              path="/profile"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <Profile />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              <Route
-                path="/edit-profile"
-                element={
+            <Route
+              path="/edit-profile"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <EditProfile />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              <Route
-                path="/subscription"
-                element={
+            <Route
+              path="/subscription"
+              element={
+                <AuthGuard>
                   <>
                     <Sidebar />
                     <main className="flex-1 overflow-y-auto">
                       <Subscription />
                     </main>
                   </>
-                }
-              />
+                </AuthGuard>
+              }
+            />
 
-              {/* Full Screen Classroom */}
-              <Route path="/classroom/:id" element={<Classroom />} />
+            {/* Full Screen Pages (Protected) */}
+            <Route 
+              path="/classroom/:id" 
+              element={
+                <AuthGuard>
+                  <Classroom />
+                </AuthGuard>
+              } 
+            />
 
-              {/* Course Completion */}
-              <Route path="/completion/:id" element={<CourseCompletion />} />
+            <Route 
+              path="/completion/:id" 
+              element={
+                <AuthGuard>
+                  <CourseCompletion />
+                </AuthGuard>
+              } 
+            />
 
-              {/* Fallback */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </div>
-        </AuthGuard>
+            {/* Fallback */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
       </Router>
     </ThemeProvider>
   );

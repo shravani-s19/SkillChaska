@@ -1,12 +1,41 @@
-import React, { useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Download, Share2, ArrowRight, Home } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { courseService } from '../services/course.service';
 
 const CourseCompletion = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
+  
+  const [courseTitle, setCourseTitle] = useState("Course");
+  const [certificateUrl, setCertificateUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch Course Info
+  useEffect(() => {
+    if (id) {
+      courseService.getById(id)
+        .then(data => {
+          setCourseTitle(data.course_title);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch course title", err);
+          setIsLoading(false);
+        });
+
+      courseService.getCertificateById(id)
+        .then(data => {
+          setCertificateUrl(data.certificateUrl);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch certificate URL", err);
+          setIsLoading(false);
+        });
+    }
+  }, [id]);
 
   useEffect(() => {
     // Trigger confetti on mount
@@ -16,7 +45,7 @@ const CourseCompletion = () => {
 
     const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-    const interval: any = setInterval(function() {
+    const interval: number = setInterval(function() {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
@@ -31,8 +60,16 @@ const CourseCompletion = () => {
     return () => clearInterval(interval);
   }, []);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen min-w-[100dvw] bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen min-w-[100dvw] bg-background flex items-center justify-center p-6">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -66,7 +103,7 @@ const CourseCompletion = () => {
             transition={{ delay: 0.4 }}
             className="text-xl text-textSecondary mb-12"
           >
-            Congratulations! You've successfully mastered <span className="text-text font-bold">Advanced Python Patterns</span>.
+            Congratulations! You've successfully mastered <span className="text-text font-bold">{courseTitle}</span>.
           </motion.p>
 
           {/* Certificate Preview Card */}
@@ -78,15 +115,11 @@ const CourseCompletion = () => {
           >
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="w-full md:w-48 aspect-video bg-surface rounded-xl overflow-hidden border border-border">
-                <img 
-                  src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80" 
-                  className="w-full h-full object-cover opacity-80"
-                  alt="Certificate"
-                />
+                <iframe src={certificateUrl} className="w-[1123px] h-[794px] border-none" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold mb-1">Professional Certificate</h3>
-                <p className="text-sm text-textSecondary mb-4">Credential ID: CM-PY-99281</p>
+                <p className="text-sm text-textSecondary mb-4">Credential ID: Pending Generation...</p>
                 <div className="flex gap-3">
                   <button className="flex items-center gap-2 text-sm font-bold text-secondary hover:underline">
                     <Download className="w-4 h-4" /> Download

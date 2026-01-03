@@ -52,18 +52,24 @@ export default {
 }
 
 // File: src/App.tsx
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Sidebar } from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import Classroom from './pages/Classroom';
-import Courses from './pages/Courses';
-import Achievements from './pages/Achievements';
-import CourseCompletion from './pages/CourseCompletion';
-import Profile from './pages/Profile';
-import EditProfile from './pages/EditProfile';
-import Subscription from './pages/Subscription';
-import { ThemeProvider } from './context/ThemeContext';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { Sidebar } from "./components/Sidebar";
+import Dashboard from "./pages/Dashboard";
+import Classroom from "./pages/Classroom";
+import Courses from "./pages/Courses";
+import Achievements from "./pages/Achievements";
+import CourseCompletion from "./pages/CourseCompletion";
+import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
+import Subscription from "./pages/Subscription";
+import Login from "./pages/Login"; // <--- Import Login
+import { ThemeProvider } from "./context/ThemeContext";
+import { AuthGuard } from "./components/AuthGuard";
 
 function App() {
   return (
@@ -71,85 +77,113 @@ function App() {
       <Router>
         <div className="flex min-h-screen bg-background text-text font-sans transition-colors duration-300">
           <Routes>
-            {/* Layout with Sidebar */}
+            {/* Public Route */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Protected Routes */}
             <Route
               path="/dashboard"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Dashboard />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <Dashboard />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
-            
+
             <Route
               path="/courses"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Courses />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <Courses />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
 
             <Route
               path="/achievements"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Achievements />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <Achievements />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
 
             <Route
               path="/profile"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Profile />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <Profile />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
 
             <Route
               path="/edit-profile"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <EditProfile />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <EditProfile />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
 
             <Route
               path="/subscription"
               element={
-                <>
-                  <Sidebar />
-                  <main className="flex-1 overflow-y-auto">
-                    <Subscription />
-                  </main>
-                </>
+                <AuthGuard>
+                  <>
+                    <Sidebar />
+                    <main className="flex-1 overflow-y-auto">
+                      <Subscription />
+                    </main>
+                  </>
+                </AuthGuard>
               }
             />
-            
-            {/* Full Screen Classroom */}
-            <Route path="/classroom/:id" element={<Classroom />} />
 
-            {/* Course Completion */}
-            <Route path="/completion/:id" element={<CourseCompletion />} />
-            
+            {/* Full Screen Pages (Protected) */}
+            <Route 
+              path="/classroom/:id" 
+              element={
+                <AuthGuard>
+                  <Classroom />
+                </AuthGuard>
+              } 
+            />
+
+            <Route 
+              path="/completion/:id" 
+              element={
+                <AuthGuard>
+                  <CourseCompletion />
+                </AuthGuard>
+              } 
+            />
+
             {/* Fallback */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
@@ -160,7 +194,6 @@ function App() {
 }
 
 export default App;
-
 // File: src/components/Achievements/BadgeCard.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -285,11 +318,58 @@ export const CertificateCard = ({ certificate }: CertificateCardProps) => {
   );
 };
 
+// File: src/components/AuthGuard.tsx
+// File: src/components/AuthGuard.tsx
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../store/useAuthStore';
+
+export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // 1. Check Auth on Mount
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // 2. Handle Redirects after loading finishes
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      console.log("Unauthorized access attempt. Redirecting to login...");
+      // Pass the current location to redirect back after login
+      navigate('/login', { state: { from: location }, replace: true });
+    }
+  }, [isLoading, isAuthenticated, navigate, location]);
+
+  // 3. Show Loading Spinner while verifying token
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="text-textSecondary text-sm font-medium animate-pulse">Verifying Access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. If not authenticated (and not loading), don't render children
+  // The useEffect above will handle the redirect.
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // 5. Render Protected Content
+  return <>{children}</>;
+};
 // File: src/components/Classroom/AIChat.tsx
-import React, { useState, useRef, useEffect } from 'react';
+// File: src/components/Classroom/AIChat.tsx
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Bot, User, Sparkles, MessageSquare } from 'lucide-react';
-import { api } from '../../services/api';
+import { Send, X, Bot, Sparkles } from 'lucide-react';
+import { learnService } from '../../services/learn.service';
 import { cn } from '../../lib/utils';
 
 interface Message {
@@ -311,7 +391,7 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
     {
       id: '1',
       role: 'assistant',
-      content: `Hi! I'm your AI Tutor. I'm tracking your progress in "${moduleContext}". How can I help you understand this lesson better?`,
+      content: `Hi! I'm your AI Tutor. I see you're studying "${moduleContext}". Ask me anything about this topic!`,
       timestamp: Date.now()
     }
   ]);
@@ -319,15 +399,23 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // 1. Add User Message
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -340,16 +428,30 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
     setIsLoading(true);
 
     try {
-      const result = await api.learn.getAiResponse(input, moduleContext);
+      // 2. Call Real AI Service
+      const data = await learnService.askAI(
+        currentTimestamp,
+        moduleContext,
+        input
+      );
+      
+      // 3. Add AI Response
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: result.response,
+        content: data.answer,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (error) {
       console.error("AI Chat Error:", error);
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm having trouble connecting to the brain right now. Please check your connection and try again.",
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -363,19 +465,20 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed right-0 top-16 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl"
+          className="fixed right-0 top-16 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl backdrop-blur-sm"
         >
-          <div className="p-4 border-b border-border flex items-center justify-between bg-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-secondary/20 rounded-lg flex items-center justify-center">
+          {/* Header */}
+          <div className="p-4 border-b border-border flex items-center justify-between bg-surface/95">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-secondary/20 rounded-xl flex items-center justify-center relative">
                 <Bot className="w-5 h-5 text-secondary" />
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-surface animate-pulse" />
               </div>
               <div>
                 <h3 className="font-bold text-sm">AI Learning Assistant</h3>
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
-                  <span className="text-[10px] text-textSecondary uppercase font-bold tracking-wider">Online</span>
-                </div>
+                <p className="text-[10px] text-textSecondary uppercase font-bold tracking-wider">
+                  Context: {formatTime(currentTimestamp)}
+                </p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors">
@@ -383,11 +486,12 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          {/* Messages Area */}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-surface/50">
             {messages.map((msg) => (
               <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
                 <div className={cn(
-                  "max-w-[85%] p-3 rounded-2xl text-sm",
+                  "max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm",
                   msg.role === 'user' 
                     ? "bg-secondary text-white rounded-tr-none" 
                     : "bg-white/5 border border-white/10 rounded-tl-none"
@@ -398,38 +502,39 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-white/5 border border-white/10 p-3 rounded-2xl rounded-tl-none">
-                  <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-textSecondary rounded-full animate-bounce" />
-                    <div className="w-1.5 h-1.5 bg-textSecondary rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-1.5 h-1.5 bg-textSecondary rounded-full animate-bounce [animation-delay:0.4s]" />
+                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none">
+                  <div className="flex gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-textSecondary/50 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-textSecondary/50 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <div className="w-1.5 h-1.5 bg-textSecondary/50 rounded-full animate-bounce [animation-delay:0.4s]" />
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="p-4 border-t border-border bg-white/5">
+          {/* Input Area */}
+          <div className="p-4 border-t border-border bg-surface">
             <div className="relative">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask anything about this lesson..."
-                className="w-full bg-background border border-border rounded-xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-secondary transition-colors"
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                placeholder="Ask about this lesson..."
+                className="w-full bg-white/5 border border-border rounded-xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-secondary focus:bg-white/10 transition-all placeholder:text-textSecondary/50"
               />
               <button 
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-secondary hover:bg-secondary/10 rounded-lg transition-all disabled:opacity-50"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-secondary hover:bg-secondary/10 rounded-lg transition-all disabled:opacity-50 disabled:hover:bg-transparent"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] text-textSecondary mt-3 text-center flex items-center justify-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              AI can make mistakes. Verify important info.
+            <p className="text-[10px] text-textSecondary mt-3 text-center flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-secondary" />
+              AI can make mistakes. Double check important info.
             </p>
           </div>
         </motion.aside>
@@ -437,12 +542,17 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
     </AnimatePresence>
   );
 };
-
 // File: src/components/Classroom/LearningHub.tsx
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Brain, Lightbulb, MessageSquare, ChevronRight, Download } from 'lucide-react';
+import { 
+  FileText, Brain, Lightbulb, Download, 
+  GitGraph, Layers, Link as LinkIcon, FileCode, FileArchive 
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useProgressStore } from '../../store/useProgressStore';
+import { learnService } from '../../services/learn.service';
+import { ModuleMaterialsResponse, MindMapNode as MindMapNodeType, Flashcard as FlashcardType } from '../../types';
 
 const TABS = [
   { id: 'notes', label: 'Smart Notes', icon: FileText },
@@ -450,19 +560,135 @@ const TABS = [
   { id: 'resources', label: 'Resources', icon: Lightbulb },
 ];
 
-export const LearningHub = () => {
-  const [activeTab, setActiveTab] = useState('notes');
+// Helper to map string types to Icons
+const getIconForType = (type: string) => {
+  switch (type) {
+    case 'pdf': return FileText;
+    case 'code': return FileCode;
+    case 'zip': return FileArchive;
+    case 'link': return LinkIcon;
+    default: return FileText;
+  }
+};
+
+const FlashCard = ({ card }: { card: FlashcardType }) => {
+  const [isFlipped, setIsFlipped] = useState(false);
 
   return (
-    <div className="mt-8 bg-surface border border-border rounded-3xl overflow-hidden">
-      <div className="flex border-b border-border">
+    <div 
+      className="group perspective-1000 h-48 cursor-pointer"
+      onClick={() => setIsFlipped(!isFlipped)}
+    >
+      <motion.div
+        initial={false}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
+        className="relative w-full h-full preserve-3d"
+      >
+        {/* Front */}
+        <div className="absolute inset-0 backface-hidden bg-white/5 border border-white/10 hover:border-secondary/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-lg transition-colors">
+          <div className="w-8 h-8 bg-secondary/10 rounded-full flex items-center justify-center mb-3">
+            <span className="text-secondary font-bold text-lg">?</span>
+          </div>
+          <h4 className="font-bold text-lg">{card.front_text}</h4>
+          <p className="text-xs text-textSecondary mt-4">Click to flip</p>
+        </div>
+
+        {/* Back */}
+        <div className="absolute inset-0 backface-hidden rotate-y-180 bg-secondary/10 border border-secondary/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-lg">
+          <h4 className="font-medium text-sm leading-relaxed">{card.back_text}</h4>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// Recursive Mind Map Node
+const MindMapNode = ({ node, depth = 0 }: { node: MindMapNodeType, depth?: number }) => (
+  <div className="flex flex-col items-center">
+    <div className={cn(
+      "px-4 py-2 rounded-xl border font-bold text-sm mb-4 relative z-10 transition-all hover:scale-105",
+      depth === 0 ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20" : 
+      depth === 1 ? "bg-surface border-white/20 text-text" : 
+      "bg-white/5 border-white/10 text-textSecondary text-xs"
+    )}>
+      {node.label}
+    </div>
+    {node.children && node.children.length > 0 && (
+      <div className="flex gap-4 relative">
+        {/* Connector Lines (Visual Only) */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-4 bg-white/10 -mt-4" />
+        <div className="absolute top-0 left-4 right-4 h-px bg-white/10 -mt-4" />
+        
+        {node.children.map((child) => (
+          <div key={child.id} className="pt-4 relative">
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-4 bg-white/10 -mt-4" />
+            <MindMapNode node={child} depth={depth + 1} />
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+export const LearningHub = () => {
+  const [activeTab, setActiveTab] = useState('notes');
+  const [revisionMode, setRevisionMode] = useState<'flashcards' | 'mindmap'>('mindmap');
+  
+  // State for fetched data
+  const [materials, setMaterials] = useState<ModuleMaterialsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Store
+  const { activeCourseId, activeModuleId } = useProgressStore();
+
+  useEffect(() => {
+    if (activeCourseId && activeModuleId) {
+      const fetchMaterials = async () => {
+        setIsLoading(true);
+        try {
+          const data = await learnService.getModuleMaterials(activeCourseId, activeModuleId);
+          setMaterials(data);
+        } catch (error) {
+          console.error("Failed to load learning materials", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchMaterials();
+    }
+  }, [activeCourseId, activeModuleId]);
+
+  if (isLoading) {
+    return (
+      <div className="mt-8 bg-surface border border-border rounded-3xl h-[600px] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="w-6 h-6 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-textSecondary">Loading AI Materials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!materials) {
+     return (
+       <div className="mt-8 bg-surface border border-border rounded-3xl h-[600px] flex items-center justify-center">
+         <p className="text-textSecondary">No additional materials available for this module.</p>
+       </div>
+     );
+  }
+
+  return (
+    <div className="mt-8 bg-surface border border-border rounded-3xl overflow-hidden flex flex-col h-[600px]">
+      {/* Tab Navigation */}
+      <div className="flex border-b border-border shrink-0">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold transition-all relative",
-              activeTab === tab.id ? "text-secondary" : "text-textSecondary hover:text-text"
+              "flex-1 flex items-center justify-center gap-2 py-5 text-sm font-bold transition-all relative hover:bg-white/5",
+              activeTab === tab.id ? "text-secondary" : "text-textSecondary"
             )}
           >
             <tab.icon className="w-4 h-4" />
@@ -477,217 +703,351 @@ export const LearningHub = () => {
         ))}
       </div>
 
-      <div className="p-8">
+      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
         {activeTab === 'notes' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h4 className="font-bold">Auto-Generated Notes</h4>
+              <h4 className="font-bold text-lg">Auto-Generated Notes</h4>
               <button className="text-xs text-secondary font-bold flex items-center gap-1 hover:underline">
                 <Download className="w-3 h-3" /> Export PDF
               </button>
             </div>
             <div className="space-y-4">
-              {[
-                { time: "02:15", text: "Variables are containers for storing data values." },
-                { time: "05:40", text: "Python has no command for declaring a variable." },
-                { time: "08:12", text: "Variable names are case-sensitive (age, Age and AGE are three different variables)." }
-              ].map((note, i) => (
-                <div key={i} className="flex gap-4 group">
-                  <span className="text-xs font-mono text-secondary bg-secondary/10 px-2 py-1 rounded h-fit">
-                    {note.time}
-                  </span>
-                  <p className="text-sm text-textSecondary leading-relaxed group-hover:text-text transition-colors">
-                    {note.text}
-                  </p>
-                </div>
-              ))}
+              {materials.ai_smart_notes.length > 0 ? (
+                materials.ai_smart_notes.map((note) => (
+                  <div key={note.note_id} className="flex gap-4 group p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer">
+                    <span className="text-xs font-mono text-secondary bg-secondary/10 px-2 py-1 rounded h-fit whitespace-nowrap">
+                      {note.formatted_time}
+                    </span>
+                    <p className="text-sm text-textSecondary leading-relaxed group-hover:text-text transition-colors">
+                      {note.note_text}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-textSecondary text-sm italic">No AI notes generated yet.</p>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'revision' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-secondary/30 transition-all cursor-pointer group">
-              <div className="w-10 h-10 bg-secondary/20 rounded-xl flex items-center justify-center mb-4">
-                <Brain className="w-5 h-5 text-secondary" />
-              </div>
-              <h4 className="font-bold mb-2">Flashcards</h4>
-              <p className="text-xs text-textSecondary mb-4">15 cards generated from this lesson</p>
-              <div className="flex items-center text-xs font-bold text-secondary group-hover:gap-2 transition-all">
-                Practice Now <ChevronRight className="w-4 h-4" />
-              </div>
+          <div className="space-y-6 h-full flex flex-col">
+            <div className="flex bg-white/5 p-1 rounded-xl self-center shrink-0">
+              <button
+                onClick={() => setRevisionMode('mindmap')}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all",
+                  revisionMode === 'mindmap' ? "bg-surface shadow-md text-text" : "text-textSecondary hover:text-text"
+                )}
+              >
+                <GitGraph className="w-4 h-4" /> Mind Map
+              </button>
+              <button
+                onClick={() => setRevisionMode('flashcards')}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all",
+                  revisionMode === 'flashcards' ? "bg-surface shadow-md text-text" : "text-textSecondary hover:text-text"
+                )}
+              >
+                <Layers className="w-4 h-4" /> Flashcards
+              </button>
             </div>
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-secondary/30 transition-all cursor-pointer group">
-              <div className="w-10 h-10 bg-accent/20 rounded-xl flex items-center justify-center mb-4">
-                <MessageSquare className="w-5 h-5 text-accent" />
-              </div>
-              <h4 className="font-bold mb-2">Quick Quiz</h4>
-              <p className="text-xs text-textSecondary mb-4">Test your knowledge with 5 AI questions</p>
-              <div className="flex items-center text-xs font-bold text-accent group-hover:gap-2 transition-all">
-                Start Quiz <ChevronRight className="w-4 h-4" />
-              </div>
+
+            <div className="flex-1 flex items-center justify-center min-h-[300px]">
+              {revisionMode === 'mindmap' ? (
+                materials.ai_mind_map ? (
+                  <div className="w-full overflow-x-auto pb-4 text-center">
+                    <MindMapNode node={materials.ai_mind_map} />
+                  </div>
+                ) : <p className="text-textSecondary text-sm">Mind map not available.</p>
+              ) : (
+                materials.ai_flashcards.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                    {materials.ai_flashcards.map((card) => (
+                      <FlashCard key={card.card_id} card={card} />
+                    ))}
+                  </div>
+                ) : <p className="text-textSecondary text-sm">No flashcards available.</p>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'resources' && (
           <div className="space-y-3">
-            {[
-              { name: "Python Variables Cheat Sheet", size: "1.2 MB", type: "PDF" },
-              { name: "Source Code Examples", size: "45 KB", type: "ZIP" },
-              { name: "Recommended Reading", size: "Link", type: "URL" }
-            ].map((res, i) => (
-              <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center text-[10px] font-bold">
-                    {res.type}
-                  </div>
-                  <span className="text-sm font-medium">{res.name}</span>
-                </div>
-                <span className="text-xs text-textSecondary">{res.size}</span>
-              </div>
-            ))}
+            {materials.module_resources.length > 0 ? (
+              materials.module_resources.map((res) => {
+                const Icon = getIconForType(res.resource_type);
+                return (
+                  <a 
+                    key={res.resource_id} 
+                    href={res.resource_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-surface rounded-xl flex items-center justify-center text-textSecondary group-hover:text-secondary transition-colors">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-sm font-bold block mb-0.5">{res.resource_name}</span>
+                        <span className="text-xs text-textSecondary uppercase">{res.resource_type} {res.resource_size && `• ${res.resource_size}`}</span>
+                      </div>
+                    </div>
+                    <Download className="w-4 h-4 text-textSecondary group-hover:text-text transition-colors" />
+                  </a>
+                );
+              })
+            ) : (
+              <p className="text-textSecondary text-sm italic">No downloadable resources.</p>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 };
-
 // File: src/components/Classroom/Syllabus.tsx
-import React from 'react';
-import { Play, Lock, CheckCircle2, Clock } from 'lucide-react';
-import { SYLLABUS } from '../../data/mockData';
+// File: src/components/Classroom/Syllabus.tsx
+import { Play, Lock, CheckCircle2, FileText, Unlock, Video } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useProgressStore } from '../../store/useProgressStore';
+import { ModuleEntity } from '../../types';
 
-export const Syllabus = () => {
+interface SyllabusProps {
+  modules: ModuleEntity[];
+}
+
+export const Syllabus = ({ modules }: SyllabusProps) => {
+  // Access global progress state
+  const { getModuleStatus, setActiveModule, activeCourseId, activeModuleId } = useProgressStore();
+
   return (
     <div className="bg-surface border border-border rounded-3xl overflow-hidden sticky top-24">
       <div className="p-6 border-b border-border bg-white/5">
         <h3 className="font-bold text-lg">Course Content</h3>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs text-textSecondary">12 Lessons</span>
+          <span className="text-xs text-textSecondary">{modules.length} Lessons</span>
           <div className="w-1 h-1 bg-textSecondary rounded-full" />
-          <span className="text-xs text-textSecondary">4h 20m total</span>
+          <span className="text-xs text-textSecondary">Sequential Learning</span>
         </div>
       </div>
       
       <div className="max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
-        {SYLLABUS.map((module, mIdx) => (
-          <div key={module.id} className="border-b border-border last:border-0">
-            <div className="px-6 py-4 bg-white/[0.02]">
-              <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">Module {mIdx + 1}</span>
-              <h4 className="font-bold text-sm mt-1">{module.title}</h4>
-            </div>
-            <div className="py-2">
-              {module.lessons.map((lesson) => (
-                <button
-                  key={lesson.id}
-                  className={cn(
-                    "w-full px-6 py-4 flex items-start gap-4 transition-all group text-left",
-                    lesson.status === 'current' ? "bg-secondary/10" : "hover:bg-white/5",
-                    lesson.status === 'locked' && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <div className="mt-1">
-                    {lesson.status === 'completed' ? (
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                    ) : lesson.status === 'locked' ? (
-                      <Lock className="w-5 h-5 text-textSecondary" />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-secondary flex items-center justify-center">
-                        <div className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-sm font-medium truncate",
-                      lesson.status === 'current' ? "text-secondary" : "text-text"
-                    )}>
-                      {lesson.title}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Clock className="w-3 h-3 text-textSecondary" />
-                      <span className="text-xs text-textSecondary">{lesson.duration}</span>
+        <div className="py-2">
+          {modules.map((module, index) => {
+            // Determine Status: 'locked' | 'current' | 'completed' | 'unlocked'
+            const status = getModuleStatus(activeCourseId, module.module_id);
+            
+            const isLocked = status === 'locked';
+            const isCompleted = status === 'completed';
+            const isCurrent = activeModuleId === module.module_id;
+
+            return (
+              <button
+                key={module.module_id}
+                disabled={isLocked}
+                onClick={() => setActiveModule(module.module_id)}
+                className={cn(
+                  "w-full px-6 py-4 flex items-start gap-4 transition-all group text-left border-b border-border/50 last:border-0",
+                  isCurrent ? "bg-secondary/10" : "hover:bg-white/5",
+                  isLocked && "opacity-50 cursor-not-allowed bg-transparent"
+                )}
+              >
+                {/* Status Icon */}
+                <div className="mt-1 shrink-0">
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-5 h-5 text-success" />
+                  ) : isLocked ? (
+                    <Lock className="w-5 h-5 text-textSecondary" />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full border-2 border-secondary flex items-center justify-center">
+                      {isCurrent ? (
+                          <div className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
+                      ) : (
+                          <Unlock className="w-3 h-3 text-secondary" /> 
+                      )}
                     </div>
-                  </div>
-                  {lesson.status !== 'locked' && (
-                    <Play className={cn(
-                      "w-4 h-4 transition-all opacity-0 group-hover:opacity-100",
-                      lesson.status === 'current' ? "text-secondary opacity-100" : "text-textSecondary"
-                    )} />
                   )}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+                </div>
+
+                {/* Content Info */}
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-bold text-textSecondary uppercase tracking-widest mb-0.5 block">
+                    Module {index + 1}
+                  </span>
+                  <p className={cn(
+                    "text-sm font-medium truncate",
+                    isCurrent ? "text-secondary" : "text-text"
+                  )}>
+                    {module.module_title}
+                  </p>
+                  
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {module.module_resource_type === 'video' ? (
+                      <Video className="w-3 h-3 text-textSecondary" />
+                    ) : (
+                      <FileText className="w-3 h-3 text-textSecondary" />
+                    )}
+                    <span className="text-xs text-textSecondary capitalize">
+                      {module.module_resource_type}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Play Indicator (Hover) */}
+                {!isLocked && (
+                  <Play className={cn(
+                    "w-4 h-4 transition-all opacity-0 group-hover:opacity-100 shrink-0 mt-2",
+                    isCurrent ? "text-secondary opacity-100" : "text-textSecondary"
+                  )} />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 };
-
+// File: src/components/Classroom/VideoPlayer.tsx
 // File: src/components/Classroom/VideoPlayer.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, Pause, Volume2, VolumeX, Settings, Maximize, 
-  RotateCcw, SkipForward, CheckCircle2, HighContrast 
+  RotateCcw, CheckCircle2, XCircle, AlertCircle 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../../services/api';
+
+// Services & Utils
+import { learnService } from '../../services/learn.service';
 import { cn } from '../../lib/utils';
+import { useProgressStore } from '../../store/useProgressStore';
+import { InteractionPoint } from '../../types';
 
 interface VideoPlayerProps {
-  onTimeUpdate?: (time: number) => void;
+  moduleId: string;
+  courseId: string;
+  videoUrl: string; // New Prop: Real Signed URL
+  interactionPoints: InteractionPoint[]; // New Prop: Real Interaction Data
+  initialStartTime?: number;
   onComplete?: () => void;
+  onTimeUpdate?: (time: number) => void;
 }
 
-export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
+export const VideoPlayer = ({ 
+  moduleId, 
+  courseId, 
+  videoUrl,
+  interactionPoints,
+  initialStartTime = 0, 
+  onComplete, 
+  onTimeUpdate 
+}: VideoPlayerProps) => {
+  
+  // Store Action (Handles Optimistic UI + Backend Heartbeat)
+  const updateVideoProgress = useProgressStore(state => state.updateVideoProgress);
+
+  // Player State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [quality, setQuality] = useState('1080p');
   const [playbackRate, setPlaybackRate] = useState(1);
+  
+  // Anti-Seek & Resume State
+  const [maxWatchedTime, setMaxWatchedTime] = useState(initialStartTime);
+  const [showSeekWarning, setShowSeekWarning] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  // Quiz State
+  const [activeQuiz, setActiveQuiz] = useState<InteractionPoint | null>(null);
+  const [quizCompletedIds, setQuizCompletedIds] = useState<Set<string>>(new Set());
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [quizFeedback, setQuizFeedback] = useState<{isCorrect: boolean, msg: string} | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const INTERACTION_TIME = 15; // Trigger quiz at 15s for demo
+  // 1. Handle Initial Resume Logic
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && !isReady && videoUrl) {
+      // Set the video time to where they left off
+      video.currentTime = initialStartTime;
+      setCurrentTime(initialStartTime);
+      setMaxWatchedTime(initialStartTime);
+      setIsReady(true);
+    }
+  }, [initialStartTime, videoUrl, isReady]);
 
+  // 2. Handle Time Update & Checkpoints
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      onTimeUpdate?.(video.currentTime);
+      const time = video.currentTime;
+      onTimeUpdate?.(time);
+      setCurrentTime(time);
 
-      if (Math.floor(video.currentTime) === INTERACTION_TIME && !showQuiz) {
+      // Update Max Watched Time
+      if (time > maxWatchedTime) {
+        setMaxWatchedTime(time);
+      }
+
+      // Checkpoint Save (Every 5 seconds approx)
+      if (Math.floor(time) % 5 === 0) {
+        // This action now calls learnService.sendHeartbeat internally in the store
+        updateVideoProgress(courseId, moduleId, time);
+      }
+
+      // Interaction Points Logic (Quiz Trigger)
+      const interaction = interactionPoints.find(
+        p => Math.floor(time) === p.interaction_timestamp_seconds && !quizCompletedIds.has(p.interaction_id)
+      );
+
+      if (interaction && !activeQuiz) {
         video.pause();
         setIsPlaying(false);
-        setShowQuiz(true);
+        setActiveQuiz(interaction);
       }
     };
 
+    // Anti-Seek Logic
+    const handleSeeking = () => {
+      // Allow seeking BACKWARDS or within maxWatchedTime + buffer
+      if (video.currentTime > maxWatchedTime + 2) {
+        video.currentTime = maxWatchedTime;
+        setShowSeekWarning(true);
+        setTimeout(() => setShowSeekWarning(false), 2000);
+      }
+    };
+
+    const handleEnded = () => {
+      updateVideoProgress(courseId, moduleId, duration); 
+      onComplete?.();
+    };
+
     const handleLoadedMetadata = () => setDuration(video.duration);
-    const handleEnded = () => onComplete?.();
 
     video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('seeking', handleSeeking);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('ended', handleEnded);
     
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('seeking', handleSeeking);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [showQuiz, onTimeUpdate, onComplete]);
+  }, [maxWatchedTime, activeQuiz, quizCompletedIds, onComplete, interactionPoints, courseId, moduleId, updateVideoProgress, duration, onTimeUpdate]);
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -707,24 +1067,48 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
+    // Strict seek restriction
+    if (time <= maxWatchedTime) {
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+        setCurrentTime(time);
+      }
+    } else {
+      setShowSeekWarning(true);
+      setTimeout(() => setShowSeekWarning(false), 2000);
     }
   };
 
+  // 3. Quiz Handling with Real API
   const handleQuizSubmit = async () => {
-    if (!selectedOption) return;
-    const result = await api.learn.validateAnswer({
-      module_id: "mod_01",
-      interaction_id: "q1",
-      selected_option: selectedOption
-    });
+    if (!selectedOption || !activeQuiz) return;
+    setIsValidating(true);
 
-    if (result.is_correct) {
-      setShowQuiz(false);
-      videoRef.current?.play();
-      setIsPlaying(true);
+    try {
+      const result = await learnService.validateAnswer(
+        moduleId,
+        activeQuiz.interaction_id,
+        selectedOption
+      );
+
+      setQuizFeedback({ isCorrect: result.is_correct, msg: result.feedback });
+      setIsValidating(false);
+
+      if (result.is_correct) {
+        // Auto continue after short delay if correct
+        setTimeout(() => {
+          setQuizCompletedIds(prev => new Set(prev).add(activeQuiz.interaction_id));
+          setActiveQuiz(null);
+          setQuizFeedback(null);
+          setSelectedOption(null);
+          videoRef.current?.play();
+          setIsPlaying(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Quiz Validation Error", error);
+      setIsValidating(false);
+      setQuizFeedback({ isCorrect: false, msg: "Failed to validate answer. Please try again." });
     }
   };
 
@@ -737,92 +1121,144 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
   return (
     <div 
       ref={containerRef}
-      className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-border group shadow-2xl"
+      className="relative aspect-video bg-black rounded-3xl overflow-hidden border border-border group shadow-2xl select-none"
     >
       <video 
         ref={videoRef}
-        src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-        className="w-full h-full object-cover cursor-pointer"
+        src={videoUrl}
+        className="w-full h-full object-cover"
         onClick={togglePlay}
         playsInline
       />
 
+      {/* Seek Warning Toast */}
+      <AnimatePresence>
+        {showSeekWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-8 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 z-50 backdrop-blur-md"
+          >
+            <AlertCircle className="w-4 h-4" />
+            Fast forwarding is disabled
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Quiz Overlay */}
       <AnimatePresence>
-        {showQuiz && (
+        {activeQuiz && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center z-30 p-6 bg-black/60 backdrop-blur-md"
+            className="absolute inset-0 flex items-center justify-center z-40 bg-black/80 backdrop-blur-sm p-6"
           >
             <motion.div 
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              className="bg-surface border border-white/10 p-8 rounded-3xl max-w-md w-full shadow-2xl"
+              className="bg-surface border border-border p-8 rounded-3xl max-w-lg w-full shadow-2xl relative overflow-hidden"
             >
-              <div className="flex items-center gap-2 mb-6">
+              {/* Background Decoration */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -mr-16 -mt-16" />
+
+              <div className="flex items-center gap-2 mb-6 relative">
                 <div className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
-                <span className="text-secondary text-xs font-bold uppercase tracking-widest">Knowledge Check</span>
+                <span className="text-secondary text-xs font-bold uppercase tracking-widest">Interaction Point</span>
               </div>
-              <h3 className="text-xl font-bold mb-6">Which symbol is used for assignment in Python?</h3>
               
-              <div className="space-y-3 mb-8">
-                {['=', '==', '->', ':'].map((option) => (
+              {/* Updated: Use Real API fields */}
+              <h3 className="text-xl font-bold mb-6 relative">{activeQuiz.interaction_question_text}</h3>
+              
+              <div className="space-y-3 mb-8 relative">
+                {activeQuiz.interaction_options_list.map((option: string) => (
                   <button
                     key={option}
-                    onClick={() => setSelectedOption(option)}
+                    onClick={() => !quizFeedback?.isCorrect && setSelectedOption(option)}
+                    disabled={isValidating || (quizFeedback?.isCorrect ?? false)}
                     className={cn(
                       "w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between group",
                       selectedOption === option 
-                        ? 'border-secondary bg-secondary/10 text-secondary' 
+                        ? quizFeedback 
+                          ? quizFeedback.isCorrect 
+                            ? 'border-success bg-success/10 text-success' 
+                            : 'border-error bg-error/10 text-error'
+                          : 'border-secondary bg-secondary/10 text-secondary' 
                         : 'border-white/5 hover:border-white/20 bg-white/5'
                     )}
                   >
-                    <span className="font-medium">{option}</span>
-                    {selectedOption === option && <CheckCircle2 className="w-5 h-5" />}
+                    <span className="font-medium text-sm">{option}</span>
+                    {selectedOption === option && (
+                      quizFeedback 
+                        ? (quizFeedback.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />)
+                        : <div className="w-5 h-5 rounded-full border-2 border-secondary border-t-transparent animate-spin" style={{ animation: 'none' }} />
+                    )}
                   </button>
                 ))}
               </div>
 
+              {quizFeedback && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className={cn(
+                    "mb-6 text-sm font-bold flex items-center gap-2",
+                    quizFeedback.isCorrect ? "text-success" : "text-error"
+                  )}
+                >
+                  {quizFeedback.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  {quizFeedback.msg}
+                </motion.div>
+              )}
+
               <button 
                 onClick={handleQuizSubmit}
-                disabled={!selectedOption}
-                className="w-full py-4 bg-secondary text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-secondary/20"
+                disabled={!selectedOption || isValidating || (quizFeedback?.isCorrect ?? false)}
+                className="w-full py-4 bg-secondary text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-secondary/20 flex items-center justify-center gap-2"
               >
-                Continue Lesson
+                {isValidating ? 'Checking...' : quizFeedback?.isCorrect ? 'Continuing...' : 'Submit Answer'}
               </button>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Custom Controls */}
-      <div className="absolute bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-        {/* Progress Bar */}
+      {/* Controls Overlay */}
+      <div className="absolute bottom-0 inset-x-0 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 z-30">
+        
+        {/* Progress Bar with MaxWatched Logic */}
         <div className="relative h-1.5 w-full bg-white/20 rounded-full mb-6 group/progress cursor-pointer">
+          {/* Seek Input */}
           <input
             type="range"
             min="0"
             max={duration || 0}
             value={currentTime}
             onChange={handleSeek}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
           />
+          
+          {/* Max Watched Track (Gray) */}
           <div 
-            className="absolute top-0 left-0 h-full bg-secondary rounded-full transition-all" 
+            className="absolute top-0 left-0 h-full bg-white/30 rounded-full" 
+            style={{ width: `${(maxWatchedTime / duration) * 100}%` }}
+          />
+
+          {/* Current Progress (Colored) */}
+          <div 
+            className="absolute top-0 left-0 h-full bg-secondary rounded-full relative" 
             style={{ width: `${(currentTime / duration) * 100}%` }}
           >
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/progress:scale-100 transition-transform" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg scale-0 group-hover/progress:scale-100 transition-transform z-10" />
           </div>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-5">
-            <button onClick={togglePlay} className="hover:scale-110 transition-transform">
+            <button onClick={togglePlay} className="hover:scale-110 transition-transform focus:outline-none">
               {isPlaying ? <Pause className="w-6 h-6 text-white fill-current" /> : <Play className="w-6 h-6 text-white fill-current" />}
             </button>
-            <button className="hover:rotate-[-45deg] transition-transform">
+            <button onClick={() => { if(videoRef.current) videoRef.current.currentTime -= 10; }} className="hover:-rotate-45 transition-transform">
               <RotateCcw className="w-5 h-5 text-white" />
             </button>
             
@@ -837,8 +1273,12 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
                   max="1" 
                   step="0.1"
                   value={isMuted ? 0 : volume}
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  className="w-full accent-white"
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setVolume(val);
+                    if(videoRef.current) videoRef.current.volume = val;
+                  }}
+                  className="w-full accent-white h-1"
                 />
               </div>
             </div>
@@ -863,24 +1303,10 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full right-0 mb-4 w-48 bg-surface border border-white/10 rounded-2xl p-2 shadow-2xl backdrop-blur-xl"
+                    className="absolute bottom-full right-0 mb-4 w-40 bg-surface/90 border border-white/10 rounded-xl p-2 shadow-2xl backdrop-blur-xl overflow-hidden"
                   >
-                    <div className="p-2 text-[10px] font-bold text-textSecondary uppercase tracking-widest">Quality</div>
-                    {['1080p', '720p', 'Auto'].map(q => (
-                      <button 
-                        key={q}
-                        onClick={() => { setQuality(q); setShowSettings(false); }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                          quality === q ? "bg-secondary/20 text-secondary" : "hover:bg-white/5"
-                        )}
-                      >
-                        {q}
-                      </button>
-                    ))}
-                    <div className="h-px bg-white/5 my-2" />
                     <div className="p-2 text-[10px] font-bold text-textSecondary uppercase tracking-widest">Speed</div>
-                    {[1, 1.5, 2].map(s => (
+                    {[1, 1.25, 1.5, 2].map(s => (
                       <button 
                         key={s}
                         onClick={() => { 
@@ -889,11 +1315,12 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
                           setShowSettings(false); 
                         }}
                         className={cn(
-                          "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                          playbackRate === s ? "bg-secondary/20 text-secondary" : "hover:bg-white/5"
+                          "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex justify-between",
+                          playbackRate === s ? "bg-secondary/20 text-secondary font-bold" : "hover:bg-white/5 text-text"
                         )}
                       >
                         {s}x
+                        {playbackRate === s && <CheckCircle2 className="w-3 h-3" />}
                       </button>
                     ))}
                   </motion.div>
@@ -909,21 +1336,14 @@ export const VideoPlayer = ({ onTimeUpdate, onComplete }: VideoPlayerProps) => {
     </div>
   );
 };
-
 // File: src/components/Dashboard/CourseCard.tsx
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { CourseEntity } from '../../types';
 
 interface CourseCardProps {
-  course: {
-    id: string;
-    title: string;
-    thumbnail: string;
-    difficulty: string;
-    progress: number;
-  };
+  course: CourseEntity;
 }
 
 export const CourseCard = ({ course }: CourseCardProps) => (
@@ -933,13 +1353,13 @@ export const CourseCard = ({ course }: CourseCardProps) => (
   >
     <div className="relative aspect-video overflow-hidden">
       <img 
-        src={course.thumbnail} 
-        alt={course.title}
+        src={course.course_thumbnail_url} 
+        alt={course.course_title}
         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
       />
       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
         <Link 
-          to={`/classroom/${course.id}`}
+          to={`/classroom/${course.course_id}`}
           className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center text-white transform translate-y-4 group-hover:translate-y-0 transition-transform shadow-lg"
         >
           <Play className="fill-current ml-1" />
@@ -947,27 +1367,27 @@ export const CourseCard = ({ course }: CourseCardProps) => (
       </div>
       <div className="absolute top-3 left-3">
         <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
-          course.difficulty === 'Pro' 
+          course.course_difficulty === 'Pro' 
             ? 'bg-accent text-white' 
-            : course.difficulty === 'Intermediate'
+            : course.course_difficulty === 'Intermediate'
             ? 'bg-secondary text-white'
             : 'bg-success text-white'
         }`}>
-          {course.difficulty}
+          {course.course_difficulty}
         </span>
       </div>
     </div>
     <div className="p-5">
-      <h3 className="font-bold text-lg mb-4 line-clamp-1 group-hover:text-secondary transition-colors">{course.title}</h3>
+      <h3 className="font-bold text-lg mb-4 line-clamp-1 group-hover:text-secondary transition-colors">{course.course_title}</h3>
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-textSecondary">Progress</span>
-          <span className="text-secondary font-bold">{course.progress}%</span>
+          <span className="text-secondary font-bold">{course.course_progress}%</span>
         </div>
         <div className="h-1.5 bg-text/10 rounded-full overflow-hidden">
           <motion.div 
             initial={{ width: 0 }}
-            animate={{ width: `${course.progress}%` }}
+            animate={{ width: `${course.course_progress}%` }}
             className="h-full bg-secondary"
           />
         </div>
@@ -985,20 +1405,29 @@ interface StatsCardProps {
   value: string | number;
   icon: LucideIcon;
   color: string;
+  trend?: string; // Added optional trend prop
 }
 
-export const StatsCard = ({ label, value, icon: Icon, color }: StatsCardProps) => (
-  <div className="bg-surface border border-border p-6 rounded-2xl flex items-center gap-4">
+export const StatsCard = ({ label, value, icon: Icon, color, trend }: StatsCardProps) => (
+  <div className="bg-surface border border-border p-6 rounded-2xl flex items-center gap-4 hover:border-border/80 transition-colors">
     <div className={`p-3 rounded-xl ${color} bg-opacity-10`}>
       <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
     </div>
     <div>
-      <p className="text-textSecondary text-sm">{label}</p>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-textSecondary text-sm font-medium">{label}</p>
+      <p className="text-2xl font-bold mt-0.5">{value}</p>
+      
+      {/* Trend Logic */}
+      {trend && (
+        <p className={`text-xs font-bold mt-1 ${
+          trend.startsWith('+') ? 'text-success' : 'text-textSecondary'
+        }`}>
+          {trend}
+        </p>
+      )}
     </div>
   </div>
 );
-
 // File: src/components/Sidebar.tsx
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
@@ -1239,6 +1668,44 @@ export const useTheme = () => {
   background: rgb(var(--text-secondary) / 0.5);
 }
 
+// File: src/lib/axios.ts
+import axios from 'axios';
+
+const apiClient = axios.create({
+  // Use '/api' if you set up the Vite Proxy, otherwise 'http://localhost:5000/api'
+  baseURL: 'http://10.121.245.1:5000/api', 
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+apiClient.interceptors.request.use(
+  (config) => {
+    // The backend returns 'token' in the login response
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('isLoggedIn');
+      if (window.location.pathname !== '/login') {
+         window.location.href = '/login'; 
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default apiClient;
 // File: src/lib/utils.ts
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -1260,14 +1727,58 @@ createRoot(document.getElementById('root')!).render(
 )
 
 // File: src/pages/Achievements.tsx
-import React from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { Trophy, Award, Medal, Star } from 'lucide-react';
-import { BADGES, CERTIFICATES, USER_DATA } from '../data/mockData';
+import { useAuthStore } from '../store/useAuthStore';
 import { BadgeCard } from '../components/Achievements/BadgeCard';
 import { CertificateCard } from '../components/Achievements/CertificateCard';
+import { achievementsService } from '../services/achievements.service';
+import { Badge, Certificate } from '../types';
 
 const Achievements = () => {
+  const { user } = useAuthStore();
+  
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // 1. Fetch Badges
+        const badgesData = await achievementsService.getBadges();
+        setBadges(badgesData);
+
+        // 2. Fetch Certificates (using IDs from user profile)
+        if (user && user.student_stats.stat_certificates_earned) {
+          const certsData = await achievementsService.getCertificates(
+            user.student_stats.stat_certificates_earned
+          );
+          setCertificates(certsData);
+        }
+      } catch (error) {
+        console.error("Failed to load achievements", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // Loading Skeleton
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Derived Stats
+  const unlockedBadgesCount = badges.filter(b => !b.isLocked).length;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="mb-12">
@@ -1282,14 +1793,14 @@ const Achievements = () => {
         </p>
       </header>
 
-      {/* Stats Overview */}
+      {/* Stats Overview - Using Real User Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <div className="bg-surface border border-border p-6 rounded-3xl flex items-center gap-5">
           <div className="w-14 h-14 bg-secondary/10 rounded-2xl flex items-center justify-center">
             <Award className="text-secondary w-8 h-8" />
           </div>
           <div>
-            <p className="text-3xl font-bold">{USER_DATA.student_stats.total_badges}</p>
+            <p className="text-3xl font-bold">{unlockedBadgesCount}</p>
             <p className="text-sm text-textSecondary">Badges Earned</p>
           </div>
         </div>
@@ -1298,7 +1809,7 @@ const Achievements = () => {
             <Medal className="text-success w-8 h-8" />
           </div>
           <div>
-            <p className="text-3xl font-bold">{USER_DATA.student_stats.certificates_earned}</p>
+            <p className="text-3xl font-bold">{user.student_stats.stat_certificates_earned?.length || 0}</p>
             <p className="text-sm text-textSecondary">Certificates</p>
           </div>
         </div>
@@ -1318,11 +1829,11 @@ const Achievements = () => {
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold">Skill Badges</h2>
           <span className="text-sm text-textSecondary font-medium">
-            {BADGES.filter(b => !b.isLocked).length} / {BADGES.length} Unlocked
+            {unlockedBadgesCount} / {badges.length} Unlocked
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {BADGES.map((badge) => (
+          {badges.map((badge) => (
             <BadgeCard key={badge.id} badge={badge} />
           ))}
         </div>
@@ -1331,95 +1842,208 @@ const Achievements = () => {
       {/* Certificates Section */}
       <section>
         <h2 className="text-2xl font-bold mb-8">Professional Certificates</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {CERTIFICATES.map((cert) => (
-            <CertificateCard key={cert.id} certificate={cert} />
-          ))}
-        </div>
+        {certificates.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {certificates.map((cert) => (
+              <CertificateCard key={cert.id} certificate={cert} />
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 border border-dashed border-border rounded-3xl text-center text-textSecondary">
+            <Award className="w-12 h-12 mx-auto mb-3 opacity-20" />
+            <p>You haven't earned any certificates yet. Complete a course to earn one!</p>
+          </div>
+        )}
       </section>
     </div>
   );
 };
 
 export default Achievements;
-
 // File: src/pages/Classroom.tsx
-import React, { useState } from 'react';
+// File: src/pages/Classroom.tsx
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Share2, MoreVertical, MessageSquare } from 'lucide-react';
+
+// Components
 import { VideoPlayer } from '../components/Classroom/VideoPlayer';
 import { LearningHub } from '../components/Classroom/LearningHub';
 import { Syllabus } from '../components/Classroom/Syllabus';
 import { AIChat } from '../components/Classroom/AIChat';
-import { COURSE_DETAILS } from '../data/mockData';
+
+// Services & Store
+import { useProgressStore } from '../store/useProgressStore';
+import { courseService } from '../services/course.service';
+import { learnService } from '../services/learn.service';
+import { CourseEntity, InteractionPoint } from '../types';
 
 const Classroom = () => {
-  const { id } = useParams();
+  const { id } = useParams(); // This is the Course ID
   const navigate = useNavigate();
+  
+  // UI State
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Data State
+  const [courseData, setCourseData] = useState<CourseEntity | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>('');
+  const [interactionPoints, setInteractionPoints] = useState<InteractionPoint[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
+  const [serverResumeTime, setServerResumeTime] = useState(0);
 
-  // In a real app, we would fetch course details based on the 'id'
-  // For now, we use the mock COURSE_DETAILS
-  const course = COURSE_DETAILS;
+  // Global Store
+  const { 
+    initializeCourse, 
+    completeModule, 
+    activeModuleId, 
+    activeCourseId
+  } = useProgressStore();
+
+  // 1. Initialize Course & Fetch Basic Meta (Title, Syllabus structure)
+  useEffect(() => {
+    if (id) {
+      const init = async () => {
+        setIsLoading(true);
+        try {
+          // Initialize Store (Fetch resume point)
+          await initializeCourse(id);
+          
+          // Fetch Course Meta (Title, Description, List of modules)
+          const data = await courseService.getById(id);
+          setCourseData(data);
+        } catch (error) {
+          console.error("Failed to load course", error);
+        }
+        setIsLoading(false);
+      };
+      init();
+    }
+  }, [id, initializeCourse]);
+
+  // 2. Fetch Module Content (Video & Quizzes) when activeModuleId changes
+  useEffect(() => {
+    if (activeCourseId && activeModuleId) {
+      const loadModuleContent = async () => {
+        // Optional: Set a small loading state for the video area if needed
+        try {
+          // API Call: Scope 3.1
+          const content = await learnService.getPlayerContent(activeCourseId, activeModuleId);
+          
+          setVideoUrl(content.video_url);
+          setInteractionPoints(content.interaction_points);
+          setServerResumeTime(content.watched_history); // Use backend history
+        } catch (error) {
+          console.error("Failed to load module content", error);
+        }
+      };
+      loadModuleContent();
+    }
+  }, [activeCourseId, activeModuleId]);
+
+  // Helpers
+  const currentModule = courseData?.course_modules.find(m => m.module_id === activeModuleId);
 
   const handleComplete = () => {
-    navigate(`/completion/${id}`);
+    if (currentModule) {
+      completeModule(activeCourseId, activeModuleId);
+      navigate(`/completion/${id}`);
+    }
   };
 
+  if (isLoading || !courseData || !currentModule) {
+    return (
+      <div className="min-h-screen min-w-[100dvw] flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="text-textSecondary">Loading Classroom...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen min-w-[100dvw] bg-background flex flex-col">
       {/* Top Bar */}
       <header className="h-16 border-b border-border bg-surface/50 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-40">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="p-2 hover:bg-white/5 rounded-lg transition-colors">
+          <Link to="/dashboard" className="p-2 hover:bg-white/5 rounded-lg transition-colors text-textSecondary hover:text-text">
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div className="h-6 w-px bg-border" />
           <div>
-            <h1 className="font-bold text-sm">{course.course_title}</h1>
-            <p className="text-xs text-textSecondary">Module 1 • {course.course_modules[0].module_title}</p>
+            <h1 className="font-bold text-sm hidden sm:block">{courseData.course_title}</h1>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded uppercase tracking-wider">
+                Module {currentModule.module_sequence_number}
+              </span>
+              <p className="text-xs text-textSecondary truncate max-w-[200px]">{currentModule.module_title}</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              isChatOpen ? 'bg-secondary text-white' : 'bg-white/5 hover:bg-white/10 text-text'
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all border ${
+              isChatOpen 
+                ? 'bg-secondary text-white border-secondary shadow-lg shadow-secondary/20' 
+                : 'bg-surface border-border hover:bg-white/5 text-text'
             }`}
           >
             <MessageSquare className="w-4 h-4" />
-            AI Tutor
+            <span className="hidden sm:inline">AI Tutor</span>
           </button>
-          <div className="h-6 w-px bg-border mx-2" />
-          <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-            <Share2 className="w-5 h-5" />
-          </button>
-          <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-            <MoreVertical className="w-5 h-5" />
-          </button>
+          
+          <div className="h-6 w-px bg-border mx-2 hidden sm:block" />
+          
+          <div className="hidden sm:flex gap-2">
+            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors text-textSecondary hover:text-text">
+              <Share2 className="w-5 h-5" />
+            </button>
+            <button className="p-2 hover:bg-white/5 rounded-lg transition-colors text-textSecondary hover:text-text">
+              <MoreVertical className="w-5 h-5" />
+            </button>
+          </div>
+
           <button 
             onClick={handleComplete}
-            className="ml-2 bg-secondary text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
+            className="ml-2 bg-secondary text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-secondary/20 hover:scale-105 active:scale-95"
           >
-            Mark as Complete
+            Mark Complete
           </button>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <main className={`flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-500 ${isChatOpen ? 'lg:mr-96' : ''}`}>
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <main className={`flex-1 overflow-y-auto p-4 lg:p-8 transition-all duration-300 ${isChatOpen ? 'lg:mr-96' : ''}`}>
+          <div className="max-w-[1600px] mx-auto">
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
               {/* Left Column: Video & Hub */}
-              <div className="lg:col-span-3">
-                <VideoPlayer onTimeUpdate={(time) => setCurrentTime(time)} />
+              <div className="xl:col-span-3 space-y-6">
+                {/* 
+                  KEY PROP IS CRITICAL:
+                  activeModuleId as key forces remount to apply new initialStartTime
+                */}
+                <VideoPlayer 
+                  key={activeModuleId} 
+                  courseId={activeCourseId}
+                  moduleId={activeModuleId}
+                  videoUrl={videoUrl} // New Prop
+                  interactionPoints={interactionPoints} // New Prop
+                  initialStartTime={serverResumeTime} // From Backend
+                  onTimeUpdate={(time) => setCurrentTime(time)} 
+                  onComplete={() => completeModule(activeCourseId, activeModuleId)}
+                />
+                
+                {/* Learning Hub */}
                 <LearningHub />
               </div>
 
               {/* Right Column: Syllabus */}
-              <div className="lg:col-span-1">
-                <Syllabus />
+              <div className="xl:col-span-1">
+                {/* Pass courseData modules to Syllabus to remove Mock Data dependency there too */}
+                <Syllabus modules={courseData.course_modules} />
               </div>
             </div>
           </div>
@@ -1430,7 +2054,7 @@ const Classroom = () => {
           isOpen={isChatOpen} 
           onClose={() => setIsChatOpen(false)}
           currentTimestamp={currentTime}
-          moduleContext={course.course_modules[0].module_title}
+          moduleContext={currentModule.module_title}
         />
       </div>
     </div>
@@ -1438,17 +2062,45 @@ const Classroom = () => {
 };
 
 export default Classroom;
-
 // File: src/pages/CourseCompletion.tsx
-import React, { useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Download, Share2, ArrowRight, Home } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { courseService } from '../services/course.service';
 
 const CourseCompletion = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
+  
+  const [courseTitle, setCourseTitle] = useState("Course");
+  const [certificateUrl, setCertificateUrl] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch Course Info
+  useEffect(() => {
+    if (id) {
+      courseService.getById(id)
+        .then(data => {
+          setCourseTitle(data.course_title);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch course title", err);
+          setIsLoading(false);
+        });
+
+      courseService.getCertificateById(id)
+        .then(data => {
+          setCertificateUrl(data.certificateUrl);
+          setIsLoading(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch certificate URL", err);
+          setIsLoading(false);
+        });
+    }
+  }, [id]);
 
   useEffect(() => {
     // Trigger confetti on mount
@@ -1458,7 +2110,7 @@ const CourseCompletion = () => {
 
     const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
-    const interval: any = setInterval(function() {
+    const interval: number = setInterval(function() {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
@@ -1472,6 +2124,14 @@ const CourseCompletion = () => {
 
     return () => clearInterval(interval);
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -1508,7 +2168,7 @@ const CourseCompletion = () => {
             transition={{ delay: 0.4 }}
             className="text-xl text-textSecondary mb-12"
           >
-            Congratulations! You've successfully mastered <span className="text-text font-bold">Advanced Python Patterns</span>.
+            Congratulations! You've successfully mastered <span className="text-text font-bold">{courseTitle}</span>.
           </motion.p>
 
           {/* Certificate Preview Card */}
@@ -1520,15 +2180,11 @@ const CourseCompletion = () => {
           >
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="w-full md:w-48 aspect-video bg-surface rounded-xl overflow-hidden border border-border">
-                <img 
-                  src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80" 
-                  className="w-full h-full object-cover opacity-80"
-                  alt="Certificate"
-                />
+                <iframe src={certificateUrl} className="w-[1123px] h-[794px] border-none" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold mb-1">Professional Certificate</h3>
-                <p className="text-sm text-textSecondary mb-4">Credential ID: CM-PY-99281</p>
+                <p className="text-sm text-textSecondary mb-4">Credential ID: Pending Generation...</p>
                 <div className="flex gap-3">
                   <button className="flex items-center gap-2 text-sm font-bold text-secondary hover:underline">
                     <Download className="w-4 h-4" /> Download
@@ -1563,97 +2219,52 @@ const CourseCompletion = () => {
 };
 
 export default CourseCompletion;
-
 // File: src/pages/Courses.tsx
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, BookOpen, Star, Users, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, BookOpen, Star, Users, Clock, ArrowRight, Sparkles } from 'lucide-react';
 import { CourseCard } from '../components/Dashboard/CourseCard';
-
-const ALL_COURSES = [
-  {
-    id: "python-mastery",
-    title: "Advanced Python Patterns",
-    thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Pro",
-    progress: 65,
-    rating: 4.9,
-    students: "12.4k",
-    duration: "12h 30m",
-    category: "Programming"
-  },
-  {
-    id: "react-ai",
-    title: "Building AI with React",
-    thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Beginner",
-    progress: 30,
-    rating: 4.8,
-    students: "8.2k",
-    duration: "8h 45m",
-    category: "Web Dev"
-  },
-  {
-    id: "data-science",
-    title: "Data Science Foundations",
-    thumbnail: "https://images.unsplash.com/photo-1551288049-bbda48658a7d?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Pro",
-    progress: 10,
-    rating: 4.7,
-    students: "15.1k",
-    duration: "20h 15m",
-    category: "Data Science"
-  },
-  {
-    id: "machine-learning",
-    title: "Machine Learning A-Z",
-    thumbnail: "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Intermediate",
-    progress: 0,
-    rating: 4.9,
-    students: "22.8k",
-    duration: "45h 00m",
-    category: "AI"
-  },
-  {
-    id: "neural-networks",
-    title: "Neural Networks Deep Dive",
-    thumbnail: "https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Pro",
-    progress: 0,
-    rating: 4.6,
-    students: "5.4k",
-    duration: "15h 20m",
-    category: "AI"
-  },
-  {
-    id: "web-dev-ai",
-    title: "AI-Powered Web Development",
-    thumbnail: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
-    difficulty: "Beginner",
-    progress: 0,
-    rating: 4.8,
-    students: "10.9k",
-    duration: "10h 10m",
-    category: "Web Dev"
-  }
-];
+import { courseService } from '../services/course.service';
+import { CourseEntity } from '../types';
 
 const Courses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  
+  // State for Real Data
+  const [allCourses, setAllCourses] = useState<CourseEntity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const filters = ["All", "Beginner", "Intermediate", "Pro"];
 
-  const filteredCourses = ALL_COURSES.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === "All" || course.difficulty === activeFilter;
+  // Fetch Courses on Mount
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const data = await courseService.getAll();
+        // Since getAll returns Partial<CourseEntity>[], cast or ensure types match
+        setAllCourses(data as CourseEntity[]);
+      } catch (error) {
+        console.error("Failed to fetch courses", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  const filteredCourses = allCourses.filter(course => {
+    const matchesSearch = course.course_title.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Map backend difficulty to frontend filter if needed, assuming backend matches 'Beginner' etc.
+    const matchesFilter = activeFilter === "All" || course.course_difficulty === activeFilter;
+    
     return matchesSearch && matchesFilter;
   });
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      {/* Featured Hero */}
+      {/* Featured Hero (Static for now, could be dynamic later) */}
       <section className="mb-16 relative rounded-[2.5rem] overflow-hidden bg-surface border border-white/5 group">
         <div className="absolute inset-0 bg-gradient-to-r from-secondary/20 to-transparent opacity-50" />
         <div className="relative z-10 p-12 flex flex-col md:flex-row items-center gap-12">
@@ -1692,7 +2303,7 @@ const Courses = () => {
             </div>
             <h1 className="text-4xl font-bold">Course Library</h1>
           </div>
-          <p className="text-textSecondary">Explore {ALL_COURSES.length} professional-grade courses</p>
+          <p className="text-textSecondary">Explore {allCourses.length} professional-grade courses</p>
         </div>
 
         <div className="flex items-center gap-2 p-1 bg-surface border border-border rounded-2xl">
@@ -1724,44 +2335,56 @@ const Courses = () => {
         />
       </div>
 
-      {/* Course Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        <AnimatePresence mode='popLayout'>
-          {filteredCourses.map((course, index) => (
-            <motion.div
-              key={course.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.2 }}
-            >
-              <CourseCard course={course} />
-              <div className="mt-4 flex items-center justify-between px-2">
-                <div className="flex items-center gap-4 text-xs text-textSecondary font-medium">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-accent fill-current" />
-                    <span className="text-text">{course.rating}</span>
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        /* Course Grid */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <AnimatePresence mode='popLayout'>
+            {filteredCourses.map((course) => (
+              <motion.div
+                key={course.course_id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2 }}
+              >
+                {/* 
+                  Mapping CourseEntity to CourseCardProps.
+                  Note: Backend might not have 'rating' or 'students' yet, so we use defaults.
+                */}
+                <CourseCard course={course} />
+                
+                <div className="mt-4 flex items-center justify-between px-2">
+                  <div className="flex items-center gap-4 text-xs text-textSecondary font-medium">
+                    <div className="flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 text-accent fill-current" />
+                      <span className="text-text">4.8</span> {/* Static placeholder */}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" />
+                      <span>1.2k</span> {/* Static placeholder */}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>12h</span> {/* Static placeholder */}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{course.students}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{course.duration}</span>
-                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-secondary bg-secondary/10 px-2 py-1 rounded-md">
+                    {/* Assuming category can be inferred or added later */}
+                    Tech
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-secondary bg-secondary/10 px-2 py-1 rounded-md">
-                  {course.category}
-                </span>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
 
-      {filteredCourses.length === 0 && (
+      {!isLoading && filteredCourses.length === 0 && (
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1779,9 +2402,10 @@ const Courses = () => {
 };
 
 export default Courses;
-
 // File: src/pages/Dashboard.tsx
-import React from 'react';
+import { useEffect, useState } from 'react';
+import { useAuthStore } from '../store/useAuthStore';
+import { courseService } from '../services/course.service';
 import { motion } from 'framer-motion';
 import { 
   Zap, 
@@ -1795,10 +2419,31 @@ import {
 } from 'lucide-react';
 import { CourseCard } from '../components/Dashboard/CourseCard';
 import { StatsCard } from '../components/Dashboard/StatsCard';
-import { ENROLLED_COURSES, USER_DATA } from '../data/mockData';
+import { CourseEntity } from '../types';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
+  const { user } = useAuthStore();
+  const [courses, setCourses] = useState<CourseEntity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        // Fetch real courses from API
+        const data = await courseService.getAll();
+        setCourses(data as CourseEntity[]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCourses();
+  }, []);
+
+  if (!user || loading) return <div>Loading...</div>;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -1808,7 +2453,7 @@ const Dashboard = () => {
             animate={{ opacity: 1, x: 0 }}
             className="text-4xl font-bold mb-2"
           >
-            Welcome back, {USER_DATA.student_full_name.split(' ')[0]}! 👋
+            Welcome back, {user.student_full_name.split(' ')[0]}! 👋
           </motion.h1>
           <p className="text-textSecondary">You've completed 14 modules this month. Keep it up!</p>
         </div>
@@ -1825,28 +2470,28 @@ const Dashboard = () => {
         <StatsCard 
           icon={Zap} 
           label="Current Streak" 
-          value={`${USER_DATA.student_stats.stat_days_streak} Days`} 
+          value={`${user.student_stats.stat_days_streak} Days`} 
           trend="+2 from last week"
           color="text-accent"
         />
         <StatsCard 
           icon={Clock} 
           label="Hours Learned" 
-          value={`${USER_DATA.student_stats.hours_spent}h`} 
+          value={`${user.student_stats.stat_total_watch_time_hours}h`} 
           trend="Top 5% of students"
           color="text-secondary"
         />
         <StatsCard 
           icon={Trophy} 
           label="Certificates" 
-          value={USER_DATA.student_stats.certificates_earned.toString()} 
+          value={user.student_stats.stat_certificates_earned.length.toString()} 
           trend="1 pending review"
           color="text-success"
         />
         <StatsCard 
           icon={TrendingUp} 
           label="Total XP" 
-          value={USER_DATA.student_stats.stat_total_xp.toLocaleString()} 
+          value={user.student_stats.stat_total_xp.toLocaleString()} 
           trend="Level 12 Architect"
           color="text-purple-500"
         />
@@ -1863,11 +2508,11 @@ const Dashboard = () => {
                 Continue Learning
               </h2>
             </div>
-            <Link to="/classroom/python-101" className="block group">
+            <Link to="/classroom/course_b86c399e" className="block group">
               <div className="relative rounded-[2rem] overflow-hidden bg-surface border border-white/5 p-8 flex flex-col md:flex-row items-center gap-8 transition-all hover:border-secondary/50 hover:shadow-2xl hover:shadow-secondary/10">
                 <div className="w-full md:w-48 aspect-video rounded-2xl overflow-hidden relative">
                   <img 
-                    src={ENROLLED_COURSES[0].thumbnail} 
+                    src={courses[0]?.course_thumbnail_url} 
                     alt="Course" 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
@@ -1881,11 +2526,11 @@ const Dashboard = () => {
                     <div className="w-1 h-1 bg-textSecondary rounded-full" />
                     <span className="text-xs text-textSecondary">22 mins remaining</span>
                   </div>
-                  <h3 className="text-2xl font-bold mb-4 group-hover:text-secondary transition-colors">{ENROLLED_COURSES[0].title}</h3>
+                  <h3 className="text-2xl font-bold mb-4 group-hover:text-secondary transition-colors">{courses[0]?.course_title}</h3>
                   <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${ENROLLED_COURSES[0].progress}%` }}
+                      animate={{ width: `${courses[0]?.course_progress}%` }}
                       className="h-full bg-secondary"
                     />
                   </div>
@@ -1907,8 +2552,8 @@ const Dashboard = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {ENROLLED_COURSES.map((course) => (
-                <CourseCard key={course.id} course={course} />
+              {courses.map((course) => (
+                <CourseCard key={course.course_id} course={course} />
               ))}
             </div>
           </section>
@@ -1956,29 +2601,91 @@ const Dashboard = () => {
 export default Dashboard;
 
 // File: src/pages/EditProfile.tsx
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Camera, Save, ChevronLeft, User, Mail, Globe, Github, Twitter } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, Save, ChevronLeft, User, Mail, Globe, Github } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { USER_DATA } from '../data/mockData';
+import { useAuthStore } from '../store/useAuthStore';
+import { authService } from '../services/auth.service';
 
 const EditProfile = () => {
   const navigate = useNavigate();
+  const { user, login } = useAuthStore(); // We use login to update the local store with new data
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: USER_DATA.student_full_name,
-    email: USER_DATA.student_email,
-    bio: "Passionate developer learning AI and Python patterns.",
-    website: "https://rahul.dev",
-    github: "rahulsharma",
-    twitter: "rahul_dev"
+    fullName: '',
+    email: '',
+    bio: '',
+    website: '',
+    github: ''
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  // Load User Data into Form
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        fullName: user.student_full_name || '',
+        email: user.student_email || '',
+        bio: user.student_bio || '',
+        website: user.student_website || '',
+        github: user.student_social_github || ''
+      });
+    }
+  }, [user]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate save
-    alert("Profile updated successfully!");
-    navigate('/profile');
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      // Call API
+      await authService.updateProfile({
+        student_full_name: formData.fullName,
+        student_email: formData.email,
+        student_bio: formData.bio,
+        student_website: formData.website,
+        student_social_github: formData.github
+      });
+
+      // Update Local Store (Simulating re-login to refresh state)
+      // In a real app, updateStore(updatedUser) is better
+      const token = localStorage.getItem('jwt_token');
+      if (token) login(token); 
+      
+      alert("Profile updated successfully!");
+      navigate('/profile');
+    } catch (error) {
+      console.error("Update failed", error);
+      alert("Failed to update profile. API might be missing.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setIsLoading(true);
+      try {
+        const file = e.target.files[0];
+        await authService.uploadAvatar(file);
+        
+        // Refresh profile to get new avatar
+        const token = localStorage.getItem('jwt_token');
+        if (token) login(token);
+
+        alert("Avatar updated!");
+      } catch (error) {
+        console.error("Avatar upload failed", error);
+        alert("Failed to upload avatar. API might be missing.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  if (!user) return <div className="p-8">Loading...</div>;
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -1996,11 +2703,22 @@ const EditProfile = () => {
           <div className="flex items-center gap-8">
             <div className="relative group">
               <img 
-                src={USER_DATA.student_avatar_url} 
+                src={user.student_avatar_url || "https://ui-avatars.com/api/?name=" + user.student_full_name} 
                 alt="Avatar" 
                 className="w-32 h-32 rounded-3xl object-cover border-4 border-white/5"
               />
-              <button type="button" className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*"
+                onChange={handleAvatarUpload}
+              />
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 bg-black/60 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
                 <Camera className="w-8 h-8 text-white" />
               </button>
             </div>
@@ -2008,8 +2726,13 @@ const EditProfile = () => {
               <h3 className="text-xl font-bold mb-2">Profile Picture</h3>
               <p className="text-textSecondary text-sm mb-4">PNG, JPG or GIF. Max size of 800K</p>
               <div className="flex gap-3">
-                <button type="button" className="px-4 py-2 bg-secondary text-white rounded-xl text-sm font-bold">Upload New</button>
-                <button type="button" className="px-4 py-2 bg-white/5 text-text rounded-xl text-sm font-bold hover:bg-white/10">Remove</button>
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 bg-secondary text-white rounded-xl text-sm font-bold"
+                >
+                  Upload New
+                </button>
               </div>
             </div>
           </div>
@@ -2092,10 +2815,11 @@ const EditProfile = () => {
           </button>
           <button 
             type="submit"
-            className="px-8 py-4 bg-secondary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-secondary/20"
+            disabled={isLoading}
+            className="px-8 py-4 bg-secondary text-white rounded-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-secondary/20 disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
-            Save Changes
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>
@@ -2104,29 +2828,207 @@ const EditProfile = () => {
 };
 
 export default EditProfile;
-
-// File: src/pages/Profile.tsx
-import React from 'react';
+// File: src/pages/Login.tsx
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useNavigate, Link } from 'react-router-dom';
+import { Zap, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
+import { authService } from '../services/auth.service';
+
+const Login = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { loginSuccess } = useAuthStore();
+  
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: ''
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      if (isRegistering) {
+        // --- REGISTER FLOW ---
+        // 1. Call Register
+        await authService.register(formData.email, formData.password, formData.fullName);
+        
+        // 2. Auto-Login after registration to get the token
+        const loginData = await authService.login(formData.email, formData.password);
+        
+        // 3. Update Store
+        loginSuccess(loginData.token, loginData.user);
+        
+      } else {
+        // --- LOGIN FLOW ---
+        const loginData = await authService.login(formData.email, formData.password);
+        
+        // Update Store
+        loginSuccess(loginData.token, loginData.user);
+      }
+
+      // Redirect
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+
+    } catch (err: any) {
+      console.error("Auth Error:", err);
+      // Handle axios error response structure
+      const msg = err.response?.data?.message || err.message || "Authentication failed";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-secondary/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[120px]" />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-surface border border-border p-8 rounded-[32px] shadow-2xl relative"
+      >
+        <div className="text-center mb-8">
+          <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-secondary/20">
+            <Zap className="text-white w-6 h-6 fill-current" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">
+            {isRegistering ? "Create Account" : "Welcome Back"}
+          </h1>
+          <p className="text-textSecondary text-sm">
+            {isRegistering 
+              ? "Start your journey to mastery today." 
+              : "Enter your details to access your courses."}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegistering && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-textSecondary uppercase tracking-wider ml-1">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-textSecondary" />
+                <input 
+                  type="text" 
+                  required={isRegistering}
+                  value={formData.fullName}
+                  onChange={e => setFormData({...formData, fullName: e.target.value})}
+                  className="w-full bg-white/5 border border-border rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:border-secondary transition-colors"
+                  placeholder="John Doe"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-textSecondary uppercase tracking-wider ml-1">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-textSecondary" />
+              <input 
+                type="email" 
+                required
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+                className="w-full bg-white/5 border border-border rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:border-secondary transition-colors"
+                placeholder="john@example.com"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-textSecondary uppercase tracking-wider ml-1">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-textSecondary" />
+              <input 
+                type="password" 
+                required
+                value={formData.password}
+                onChange={e => setFormData({...formData, password: e.target.value})}
+                className="w-full bg-white/5 border border-border rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:border-secondary transition-colors"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-xl bg-error/10 border border-error/20 text-error text-sm font-medium text-center">
+              {error}
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-secondary text-white py-4 rounded-xl font-bold hover:opacity-90 transition-all shadow-lg shadow-secondary/20 flex items-center justify-center gap-2 mt-4"
+          >
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                {isRegistering ? "Sign Up" : "Sign In"}
+                <ArrowRight className="w-5 h-5" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-textSecondary">
+            {isRegistering ? "Already have an account?" : "Don't have an account?"}{" "}
+            <button 
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-secondary font-bold hover:underline"
+            >
+              {isRegistering ? "Sign In" : "Sign Up"}
+            </button>
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default Login;
+// File: src/pages/Profile.tsx
+import { Link, useNavigate } from 'react-router-dom';
 import { 
-  Mail, 
-  Calendar, 
-  Shield, 
-  Zap, 
-  Flame, 
-  Star, 
-  BookOpen, 
-  Award,
-  Edit3,
-  ExternalLink,
-  Settings
+  Mail, Calendar, Shield, Zap, Flame, Star, 
+  BookOpen, Award, Edit3, ExternalLink 
 } from 'lucide-react';
-import { USER_DATA } from '../data/mockData';
+import { useAuthStore } from '../store/useAuthStore';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const joinedDate = new Date(USER_DATA.student_joined_at).toLocaleDateString('en-US', {
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const joinedDate = new Date(user.student_joined_at).toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric'
   });
@@ -2141,10 +3043,10 @@ const Profile = () => {
         
         <div className="px-8 -mt-16 flex flex-col md:flex-row items-end gap-6">
           <div className="relative group">
-            <div className="w-32 h-32 rounded-[32px] border-4 border-background overflow-hidden shadow-2xl">
+            <div className="w-32 h-32 rounded-[32px] border-4 border-background overflow-hidden shadow-2xl bg-surface">
               <img 
-                src={USER_DATA.student_avatar_url} 
-                alt={USER_DATA.student_full_name}
+                src={user.student_avatar_url || "https://ui-avatars.com/api/?name=" + user.student_full_name} 
+                alt={user.student_full_name}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -2158,21 +3060,26 @@ const Profile = () => {
           
           <div className="flex-1 pb-2">
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-3xl font-bold">{USER_DATA.student_full_name}</h1>
+              <h1 className="text-3xl font-bold">{user.student_full_name}</h1>
               <span className="px-3 py-1 bg-secondary text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg shadow-secondary/20">
-                {USER_DATA.student_subscription_tier}
+                {user.student_subscription_tier}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-textSecondary">
               <div className="flex items-center gap-1.5 text-sm">
                 <Mail className="w-4 h-4" />
-                {USER_DATA.student_email}
+                {user.student_email}
               </div>
               <div className="flex items-center gap-1.5 text-sm">
                 <Calendar className="w-4 h-4" />
                 Joined {joinedDate}
               </div>
             </div>
+            {user.student_bio && (
+              <p className="text-sm text-textSecondary mt-2 max-w-lg line-clamp-2">
+                {user.student_bio}
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3 pb-2">
@@ -2195,28 +3102,28 @@ const Profile = () => {
               <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Flame className="text-accent w-6 h-6 fill-current" />
               </div>
-              <p className="text-2xl font-bold">{USER_DATA.student_stats.stat_days_streak}</p>
+              <p className="text-2xl font-bold">{user.student_stats.stat_days_streak}</p>
               <p className="text-xs text-textSecondary font-medium uppercase tracking-wider">Day Streak</p>
             </div>
             <div className="bg-surface border border-border p-5 rounded-3xl text-center">
               <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Zap className="text-secondary w-6 h-6 fill-current" />
               </div>
-              <p className="text-2xl font-bold">{USER_DATA.student_stats.stat_total_xp}</p>
+              <p className="text-2xl font-bold">{user.student_stats.stat_total_xp}</p>
               <p className="text-xs text-textSecondary font-medium uppercase tracking-wider">Total XP</p>
             </div>
             <div className="bg-surface border border-border p-5 rounded-3xl text-center">
               <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <BookOpen className="text-success w-6 h-6" />
               </div>
-              <p className="text-2xl font-bold">{USER_DATA.student_stats.stat_modules_completed}</p>
+              <p className="text-2xl font-bold">{user.student_stats.stat_modules_completed}</p>
               <p className="text-xs text-textSecondary font-medium uppercase tracking-wider">Modules</p>
             </div>
             <div className="bg-surface border border-border p-5 rounded-3xl text-center">
               <div className="w-10 h-10 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Award className="text-purple-500 w-6 h-6" />
               </div>
-              <p className="text-2xl font-bold">{USER_DATA.student_stats.stat_certificates_earned.length}</p>
+              <p className="text-2xl font-bold">{user.student_stats.stat_certificates_earned?.length || 0}</p>
               <p className="text-xs text-textSecondary font-medium uppercase tracking-wider">Certificates</p>
             </div>
           </section>
@@ -2231,21 +3138,21 @@ const Profile = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-textSecondary mb-1">Role</p>
-                  <p className="font-bold capitalize">{USER_DATA.role}</p>
+                  <p className="font-bold capitalize">{user.role}</p>
                 </div>
                 <div className="px-3 py-1 bg-text/5 rounded-lg text-xs font-bold">Verified</div>
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-textSecondary mb-1">Subscription Status</p>
-                  <p className="font-bold text-secondary capitalize">{USER_DATA.student_subscription_tier} Member</p>
+                  <p className="font-bold text-secondary capitalize">{user.student_subscription_tier} Member</p>
                 </div>
                 <Link to="/subscription" className="text-secondary text-sm font-bold hover:underline">Manage Plan</Link>
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-textSecondary mb-1">Email Address</p>
-                  <p className="font-bold">{USER_DATA.student_email}</p>
+                  <p className="font-bold">{user.student_email}</p>
                 </div>
                 <Link to="/edit-profile" className="text-textSecondary hover:text-text transition-colors">
                   <Edit3 className="w-4 h-4" />
@@ -2275,7 +3182,10 @@ const Profile = () => {
           <section className="bg-surface border border-border rounded-[32px] p-6">
             <h3 className="font-bold mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full flex items-center justify-between p-3 hover:bg-text/5 rounded-xl transition-colors text-sm font-medium text-error">
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center justify-between p-3 hover:bg-error/5 rounded-xl transition-colors text-sm font-medium text-error"
+              >
                 Sign Out
               </button>
             </div>
@@ -2287,7 +3197,6 @@ const Profile = () => {
 };
 
 export default Profile;
-
 // File: src/pages/Subscription.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -2508,30 +3417,557 @@ const Subscription = () => {
 
 export default Subscription;
 
+// File: src/services/achievements.service.ts
+// File: src/services/achievements.service.ts
+import apiClient from '../lib/axios';
+import { Badge, Certificate } from '../types';
+
+export const achievementsService = {
+  // Get all available badges and their status for the current user
+  getBadges: async (): Promise<Badge[]> => {
+    const { data } = await apiClient.get('/achievements/badges');
+    return data;
+  },
+
+  // Get detailed certificate objects based on the IDs in the user profile
+  getCertificates: async (certificateIds: string[]): Promise<Certificate[]> => {
+    const { data } = await apiClient.post('/achievements/certificates', { ids: certificateIds });
+    return data
+  }
+};
 // File: src/services/api.ts
-// Mock API service to handle interactions
+import { COURSE_DETAILS } from '../data/mockData';
+
 export const api = {
   learn: {
     validateAnswer: async (data: { module_id: string; interaction_id: string; selected_option: string }) => {
       // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 600));
       
-      // Mock validation logic
-      const isCorrect = data.selected_option === '=';
+      const module = COURSE_DETAILS.course_modules.find(m => m.module_id === data.module_id);
+      const question = module?.module_ai_interaction_points.find(q => q.id === data.interaction_id);
+
+      if (!question) {
+        return { is_correct: false, feedback: "Error validating answer." };
+      }
+
+      const isCorrect = data.selected_option === question.correct_answer;
+      
       return {
         is_correct: isCorrect,
-        feedback: isCorrect ? "Correct! The '=' operator assigns the value on the right to the variable on the left." : "Not quite. Remember, '==' is for comparison, while '=' is for assignment."
+        feedback: isCorrect 
+          ? "Excellent! That is the correct answer." 
+          : `Incorrect. The correct answer is: ${question.correct_answer}`
       };
     },
     getAiResponse: async (message: string, context: string) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       return {
-        response: `Based on the lesson "${context}", your question about "${message}" is very relevant. In Python, variables are dynamically typed, meaning you don't need to declare their type explicitly.`
+        response: `As your AI Tutor for "${context}", I can explain that. ${message} is a core concept. In the context of this video, focus on how memory allocation changes between mutable and immutable objects.`
       };
     }
   }
 };
+// File: src/services/auth.service.ts
+// src/services/auth.service.ts
+import apiClient from '../lib/axios';
+import { StudentEntity } from '../types';
 
+interface LoginResponse {
+  status: string;
+  token: string;
+  user: StudentEntity;
+}
+
+interface RegisterResponse {
+  status: string;
+  message: string;
+  uid: string;
+}
+
+export const authService = {
+  // 1. Register
+  register: async (email: string, password: string, fullName: string) => {
+    const { data } = await apiClient.post<RegisterResponse>('/auth/register', {
+      email,
+      password,
+      full_name: fullName,
+      role: 'student',
+    });
+    return data;
+  },
+
+  // 2. Login
+  login: async (email: string, password: string) => {
+    const { data } = await apiClient.post<LoginResponse>('/auth/login', {
+      email,
+      password
+    });
+    return data;
+  },
+
+  // 3. Get Profile
+  // FIX: The backend returns the User Object directly, not wrapped in { user: ... }
+  getProfile: async () => {
+    const { data } = await apiClient.get<StudentEntity>('/auth/me');
+    return data; 
+  },
+  
+  // 4. Update Profile
+  updateProfile: async (data: Partial<StudentEntity>) => {
+    const { data: response } = await apiClient.patch<{ user: StudentEntity }>('/auth/me', data);
+    return response.user;
+  },
+  
+  // 5. Upload Avatar
+  uploadAvatar: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await apiClient.post<{ avatar_url: string }>('/auth/me/avatar', formData);
+    return data.avatar_url;
+  }
+};
+// File: src/services/course.service.ts
+import apiClient from '../lib/axios';
+import { CourseEntity } from '../types';
+
+export const courseService = {
+  getAll: async () => {
+    const { data } = await apiClient.get<Partial<CourseEntity>[]>('/course');
+    return data;
+  },
+
+  getById: async (id: string) => {
+    const { data } = await apiClient.get<CourseEntity>(`/course/${id}`);
+    return data;
+  },
+
+  getCertificateById: async (id: string) => {
+    const { data } = await apiClient.get<{certificateUrl: string}>(`/course/${id}/certificate`);
+    return data;
+  },
+
+  getResumePoint: async (courseId: string) => {
+    const { data } = await apiClient.get<{
+      status: string;
+      module_id: string;
+      start_at_timestamp: number;
+    }>(`/courses/${courseId}/resume`);
+    return data;
+  },
+};
+// File: src/services/learn.service.ts
+import apiClient from '../lib/axios';
+import { PlayerContentResponse, ValidateResponse, ModuleMaterialsResponse } from '../types';
+
+export const learnService = {
+  getPlayerContent: async (courseId: string, moduleId: string) => {
+    const { data } = await apiClient.get<PlayerContentResponse>(
+      `/learn/${courseId}/${moduleId}`
+    );
+    return data;
+  },
+
+  validateAnswer: async (moduleId: string, interactionId: string, selectedOption: string) => {
+    const { data } = await apiClient.post<ValidateResponse>('/learn/validate', {
+      module_id: moduleId,
+      interaction_id: interactionId,
+      selected_option: selectedOption,
+    });
+    return data;
+  },
+
+  sendHeartbeat: async (courseId: string, moduleId: string, timestamp: number) => {
+    await apiClient.post('/learn/heartbeat', {
+      course_id: courseId,
+      module_id: moduleId,
+      current_timestamp: timestamp,
+    });
+  },
+  
+  askAI: async (currentTimestamp: number, moduleContext: string, query: string) => {
+    const { data } = await apiClient.post<{ answer: string }>('/ai/ask', {
+      current_timestamp: currentTimestamp,
+      module_context: moduleContext,
+      student_query: query,
+    });
+    return data;
+  },
+
+  getModuleMaterials: async (courseId: string, moduleId: string) => {
+    const { data } = await apiClient.get<ModuleMaterialsResponse>(
+      `/learn/${courseId}/${moduleId}/materials`
+    );
+    return data;
+  },
+};
+// File: src/store/useAuthStore.ts
+import { create } from 'zustand';
+import { authService } from '../services/auth.service';
+import { StudentEntity } from '../types';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  user: StudentEntity | null;
+  isLoading: boolean;
+  loginSuccess: (token: string, user: StudentEntity) => void;
+  logout: () => void;
+  checkAuth: () => Promise<void>;
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  isAuthenticated: false,
+  user: null,
+  isLoading: true,
+
+  // Called after successful login API call
+  loginSuccess: (token: string, user: StudentEntity) => {
+    localStorage.setItem('auth_token', token);
+    localStorage.setItem('isLoggedIn', 'true');
+    set({ isAuthenticated: true, user, isLoading: false });
+  },
+
+  logout: () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('isLoggedIn');
+    set({ isAuthenticated: false, user: null });
+  },
+
+  checkAuth: async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      set({ isAuthenticated: false, isLoading: false });
+      return;
+    }
+
+    try {
+      const user = await authService.getProfile();
+      // Determine if the response was wrapped or direct
+      // Based on Python `return jsonify(user_data)`, it returns the object directly.
+      set({ isAuthenticated: true, user: user, isLoading: false });
+    } catch (error) {
+      console.error("Session expired", error);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('isLoggedIn');
+      set({ isAuthenticated: false, user: null, isLoading: false });
+    }
+  }
+}));
+// File: src/store/useProgressStore.ts
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { USER_DATA, SYLLABUS, StudentLearningProgress } from "../data/mockData";
+
+interface ProgressState {
+  // Course Context
+  activeCourseId: string;
+  activeModuleId: string;
+
+  // Data matching Backend Structure
+  learningProgress: StudentLearningProgress;
+
+  // Actions
+  initializeCourse: (courseId: string) => void;
+  setActiveModule: (moduleId: string) => void;
+  updateVideoProgress: (
+    courseId: string,
+    moduleId: string,
+    timestamp: number
+  ) => void;
+  completeModule: (courseId: string, moduleId: string) => void;
+
+  // Getters
+  getModuleStatus: (
+    courseId: string,
+    moduleId: string
+  ) => "locked" | "current" | "completed" | "unlocked";
+  getLastTimestamp: (courseId: string) => number;
+}
+
+export const useProgressStore = create<ProgressState>()(
+  persist(
+    (set, get) => ({
+      activeCourseId: "py-adv-01",
+      activeModuleId:
+        USER_DATA.student_learning_progress["py-adv-01"]
+          ?.last_accessed_module_id || "mod_01",
+
+      // Initialize with Mock Data
+      // Note: Persist will overwrite this with localStorage data if it exists
+      learningProgress: USER_DATA.student_learning_progress,
+
+      initializeCourse: (courseId) => {
+        set((state) => {
+          // If we already have progress for this course in our state (persisted or initial), use it
+          if (state.learningProgress[courseId]) {
+            return {
+              activeCourseId: courseId,
+              // Ensure we stay on the module the user was last on
+              activeModuleId:
+                state.learningProgress[courseId].last_accessed_module_id,
+            };
+          }
+
+          // New course initialization
+          return {
+            activeCourseId: courseId,
+            activeModuleId: "mod_01",
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                last_accessed_module_id: "mod_01",
+                last_timestamp_seconds: 0,
+                completed_modules: [],
+              },
+            },
+          };
+        });
+      },
+
+      setActiveModule: (moduleId) => {
+        set((state) => {
+          const courseId = state.activeCourseId;
+          return {
+            activeModuleId: moduleId,
+            learningProgress: {
+              ...state.learningProgress,
+              [courseId]: {
+                ...state.learningProgress[courseId],
+                last_accessed_module_id: moduleId,
+                // Do NOT reset timestamp here, otherwise switching modules resets progress
+              },
+            },
+          };
+        });
+      },
+
+      updateVideoProgress: (courseId, moduleId, timestamp) => {
+        set((state) => ({
+          learningProgress: {
+            ...state.learningProgress,
+            [courseId]: {
+              ...state.learningProgress[courseId],
+              modules: {
+                ...state.learningProgress[courseId]?.completed_modules,
+                [moduleId]: {
+                  last_timestamp_seconds: timestamp,
+                },
+              },
+            },
+          },
+        }));
+      },
+
+      completeModule: (courseId, moduleId) => {
+        const state = get();
+        const courseProgress = state.learningProgress[courseId];
+
+        if (courseProgress.completed_modules.includes(moduleId)) return;
+
+        const newCompleted = [...courseProgress.completed_modules, moduleId];
+
+        // Find next module
+        const allLessons = SYLLABUS.flatMap((m) => m.lessons);
+        const currentIndex = allLessons.findIndex((l) => l.id === moduleId);
+        let nextModuleId = state.activeModuleId;
+
+        if (currentIndex !== -1 && currentIndex < allLessons.length - 1) {
+          nextModuleId = allLessons[currentIndex + 1].id;
+        }
+
+        set({
+          activeModuleId: nextModuleId,
+          learningProgress: {
+            ...state.learningProgress,
+            [courseId]: {
+              ...courseProgress,
+              completed_modules: newCompleted,
+              last_accessed_module_id: nextModuleId,
+              last_timestamp_seconds: 0, // Reset timestamp for the NEW module
+            },
+          },
+        });
+      },
+
+      getModuleStatus: (courseId, moduleId) => {
+        const state = get();
+        const progress = state.learningProgress[courseId];
+
+        if (!progress) return "locked";
+
+        if (progress.completed_modules.includes(moduleId)) return "completed";
+        if (state.activeModuleId === moduleId) return "current";
+
+        // Check if unlocked (previous completed)
+        const allLessons = SYLLABUS.flatMap((m) => m.lessons);
+        const modIndex = allLessons.findIndex((l) => l.id === moduleId);
+
+        if (modIndex > 0) {
+          const prevModId = allLessons[modIndex - 1].id;
+          if (progress.completed_modules.includes(prevModId)) return "unlocked";
+        } else {
+          return "unlocked"; // First module
+        }
+
+        return "locked";
+      },
+
+      getLastTimestamp: (courseId) => {
+        const state = get();
+        return state.learningProgress[courseId]?.last_timestamp_seconds || 0;
+      },
+    }),
+    {
+      name: "codemaska-learning-progress", // unique name for localStorage key
+      storage: createJSONStorage(() => localStorage), // use localStorage
+
+      // Optional: Filter what gets persisted if you don't want everything
+      // partialize: (state) => ({ learningProgress: state.learningProgress }),
+    }
+  )
+);
+
+// File: src/types/index.ts
+// File: src/types/index.ts
+
+export interface StudentStats {
+  stat_days_streak: number;
+  stat_total_xp: number;
+  stat_modules_completed: number;
+  stat_total_watch_time_hours: number;
+  stat_total_quizzes_completed: number;
+  stat_certificates_earned: string[];
+}
+
+export interface StudentEntity {
+  student_id: string;
+  student_full_name: string;
+  student_email: string;
+  role: 'student' | 'instructor';
+  student_subscription_tier: 'basic' | 'pro' | 'premium';
+  student_avatar_url: string;
+  student_joined_at: string;
+  
+  // -- NEW OPTIONAL FIELDS FOR PROFILE UI --
+  student_bio?: string;
+  student_website?: string;
+  student_social_github?: string;
+  student_social_twitter?: string;
+
+  student_stats: StudentStats;
+  student_enrolled_courses: string[];
+  student_learning_progress: Record<string, {
+    last_accessed_module_id: string;
+    last_timestamp_seconds: number;
+  }>;
+}
+
+export interface InteractionPoint {
+  interaction_id: string;
+  interaction_timestamp_seconds: number;
+  interaction_type: 'quiz_mcq';
+  interaction_question_text: string;
+  interaction_options_list: string[];
+  interaction_hint_text?: string;
+}
+
+export interface ModuleEntity {
+  module_id: string;
+  module_title: string;
+  module_sequence_number: number;
+  module_resource_type: 'video' | 'document';
+  module_media_url: string;
+  module_status: 'processing' | 'ready_for_review' | 'published';
+}
+
+export interface CourseEntity {
+  course_id: string;
+  course_title: string;
+  course_progress: number;
+  course_description: string;
+  course_difficulty: 'Beginner' | 'Intermediate' | 'Pro';
+  course_price_inr: number;
+  course_instructor_id: string;
+  course_is_published: boolean;
+  course_thumbnail_url: string;
+  course_modules: ModuleEntity[];
+}
+
+export interface PlayerContentResponse {
+  video_url: string;
+  interaction_points: InteractionPoint[];
+  watched_history: number;
+}
+
+export interface ValidateResponse {
+  is_correct: boolean;
+  feedback: string;
+  action: 'continue_video' | 'rewind_to_start';
+  updated_xp: number;
+}
+
+export interface SmartNote {
+  note_id: string;
+  timestamp_seconds: number;
+  formatted_time: string; // e.g., "02:15"
+  note_text: string;
+}
+
+export interface Flashcard {
+  card_id: string;
+  front_text: string;
+  back_text: string;
+}
+
+export interface MindMapNode {
+  id: string;
+  label: string;
+  children?: MindMapNode[];
+}
+
+export interface ModuleResource {
+  resource_id: string;
+  resource_name: string;
+  resource_type: 'pdf' | 'link' | 'code' | 'zip';
+  resource_size?: string; // e.g. "2.5 MB"
+  resource_url: string;
+}
+
+export interface ModuleMaterialsResponse {
+  ai_smart_notes: SmartNote[];
+  ai_flashcards: Flashcard[];
+  ai_mind_map: MindMapNode;
+  module_resources: ModuleResource[];
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // Emoji or URL
+  color: string; // Tailwind class
+  earnedAt: string | null; // ISO Date or null
+  isLocked: boolean;
+}
+
+export interface Certificate {
+  id: string;
+  courseTitle: string;
+  issueDate: string;
+  credentialId: string;
+  thumbnail: string;
+}
+
+export interface AchievementsResponse {
+  badges: Badge[];
+  certificates: Certificate[];
+}
+
+export interface AuthResponse {
+  status: string;
+  user: StudentEntity;
+  uuid: string; // The backend-generated session ID
+}
 // File: src/vite-env.d.ts
 /// <reference types="vite/client" />
 
