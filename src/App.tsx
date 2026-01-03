@@ -1,35 +1,86 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { createContext, useContext, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Import Pages
+import LandingPage from '../src/pages/public/LandingPage';
+import LoginPage from './pages/public/Login';
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+// --- 1. MOCK AUTH CONTEXT ---
+// This simulates Firebase Auth for now so you can build the UI
+interface User {
+  name: string;
+  role: 'student' | 'instructor' | 'superadmin';
 }
 
-export default App
+const AuthContext = createContext<any>(null);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+
+  const login = (role: 'student' | 'instructor' | 'superadmin') => {
+    setUser({ name: 'Test User', role });
+  };
+
+  const logout = () => setUser(null);
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+// --- 2. PROTECTED ROUTE COMPONENT ---
+// Ensures only specific roles can access specific URLs
+const ProtectedRoute = ({ allowedRoles }: { allowedRoles: string[] }) => {
+  const { user } = useAuth();
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (!allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
+
+  return <Outlet />;
+};
+
+// --- 3. PLACEHOLDER DASHBOARDS (Temporary) ---
+const InstructorDashboard = () => <div className="p-10 text-white bg-[#171717] h-screen"><h1>Instructor Dashboard (Protected)</h1></div>;
+const SuperAdminDashboard = () => <div className="p-10 text-white bg-[#171717] h-screen"><h1>Super Admin Dashboard (Protected)</h1></div>;
+const StudentDashboard = () => <div className="p-10 text-white bg-[#171717] h-screen"><h1>Student Dashboard (Protected)</h1></div>;
+
+// --- 4. MAIN APP ROUTING ---
+function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Super Admin Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['superadmin']} />}>
+            <Route path="/superadmin" element={<SuperAdminDashboard />} />
+            {/* Add more admin routes here */}
+          </Route>
+
+          {/* Instructor Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['instructor', 'superadmin']} />}>
+            <Route path="/instructor/dashboard" element={<InstructorDashboard />} />
+            {/* You will add ReviewStudio and CourseCreate here later */}
+          </Route>
+
+          {/* Student Routes */}
+          <Route element={<ProtectedRoute allowedRoles={['student']} />}>
+            <Route path="/student/dashboard" element={<StudentDashboard />} />
+          </Route>
+
+          {/* 404 */}
+          <Route path="*" element={<div className="text-white p-10">404 Not Found</div>} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+export default App;
