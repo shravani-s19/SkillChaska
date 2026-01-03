@@ -1,31 +1,31 @@
 from flask import Blueprint, request, jsonify, g
 from core.db_manager import DatabaseManager
 from core.security import require_token
+from firebase_admin import auth # Ensure this is imported
 
 course_bp = Blueprint('course', __name__)
 db = DatabaseManager()
 
-# backend/routes/course_routes.py
-
 @course_bp.route('', methods=['GET'])
 def get_all_courses():
-    """
-    3. Get All Courses
-    Method: GET
-    Endpoint: /api/courses
-    Query Params: ?search=python&level=beginner
-    
-    Logic:
-    - If params exist -> Filter result.
-    - If params are missing -> Return ALL published courses.
-    """
     search_query = request.args.get('search')
     level = request.args.get('level')
     
+    # 1. OPTIONAL: Check for token manually to inject progress
+    # We don't use @require_token because we want guests to see courses too
+    uid = None
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            token = auth_header.split("Bearer ")[1]
+            decoded = auth.verify_id_token(token)
+            uid = decoded['uid']
+        except:
+            pass # Invalid token, treat as guest
+
     try:
-        # Call the DB method (now implemented below)
-        courses = db.get_courses_filtered(search_query, level)
-        print(courses)
+        # Pass UID to db manager
+        courses = db.get_courses_filtered(search_query, level, uid)
         return jsonify({
             "status": "success", 
             "count": len(courses),
@@ -37,27 +37,47 @@ def get_all_courses():
 
 @course_bp.route('/<course_id>', methods=['GET'])
 def get_course_details(course_id):
-    """
-    4. Get Course Details
-    Method: GET
-    Endpoint: /api/courses/<course_id>
-    """
+    # 1. Check for Token manually (Hybrid Route: Public Info + Private Content)
+    uid = None
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith("Bearer "):
+        try:
+            token = auth_header.split("Bearer ")[1]
+            decoded = auth.verify_id_token(token)
+            uid = decoded['uid']
+        except:
+            pass 
+
     try:
-        # Fetch full metadata
         course_data = db.get_course_full(course_id)
-        
         if not course_data:
             return jsonify({"status": "error", "message": "Course not found"}), 404
 
-        # Logic: If user is NOT enrolled (checked via token if present, or generic), hide video URLs
-        # For simplicity in this endpoint:
-        # We assume frontend checks enrollment via /auth/me or separate logic.
-        # Ideally, we verify token here to determine if we show video URLs.
+        # 2. SECURITY CHECK: Is Enrolled?
+        is_enrolled = False
+        if uid:
+            is_enrolled = db.is_student_enrolled(uid, course_id)
+
+        # 3. Filter Sensitive Data if not enrolled
+        if not is_enrolled:
+            # Hide modules media and AI data
+            sanitized_modules = []
+            for mod in course_data.get('course_modules', []):
+                sanitized_modules.append({
+                    "module_id": mod.get('module_id'),
+                    "module_title": mod.get('module_title'),
+                    "module_sequence_number": mod.get('module_sequence_number'),
+                    "module_resource_type": mod.get('module_resource_type'),
+                    "module_status": mod.get('module_status'),
+                    # REMOVED: module_media_url, module_ai_materials, interaction_points
+                    "is_locked": True 
+                })
+            course_data['course_modules'] = sanitized_modules
         
         return jsonify(course_data), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
+    
 @course_bp.route('/enroll', methods=['POST'])
 @require_token
 def enroll_in_course():

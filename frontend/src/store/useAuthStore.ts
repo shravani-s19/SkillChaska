@@ -29,6 +29,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isAuthenticated: false, user: null });
   },
 
+  // Update this function to handle silent refresh
   checkAuth: async () => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
@@ -38,14 +39,18 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     try {
       const user = await authService.getProfile();
-      // Determine if the response was wrapped or direct
-      // Based on Python `return jsonify(user_data)`, it returns the object directly.
       set({ isAuthenticated: true, user: user, isLoading: false });
     } catch (error) {
-      console.error("Session expired", error);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('isLoggedIn');
-      set({ isAuthenticated: false, user: null, isLoading: false });
+      // Only logout if error is 401 (Unauthorized)
+      if (error.response && error.response.status === 401) {
+        console.error("Session expired");
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('isLoggedIn');
+        set({ isAuthenticated: false, user: null, isLoading: false });
+      } else {
+        // Network error, just stop loading
+        set({ isLoading: false });
+      }
     }
   }
 }));

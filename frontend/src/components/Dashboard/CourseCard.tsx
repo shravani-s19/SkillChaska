@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Play } from "lucide-react";
 import { motion } from "framer-motion";
 import { CourseEntity } from "../../types";
 import { useAuthStore } from "../../store/useAuthStore";
@@ -10,7 +9,15 @@ interface CourseCardProps {
 
 export const CourseCard = ({ course }: CourseCardProps) => {
   const { user } = useAuthStore();
-  const isEnrolled = user?.student_enrolled_courses.includes(course.course_id);
+  
+  // FIX: Robust check for both Object-based and String-based enrollment
+  const isEnrolled = user?.student_enrolled_courses.some((enrollment) => {
+    if (typeof enrollment === 'string') {
+      return enrollment === course.course_id;
+    }
+    return enrollment.course_id === course.course_id;
+  });
+
   return (
     <motion.div
       whileHover={{ y: -5 }}
@@ -22,14 +29,14 @@ export const CourseCard = ({ course }: CourseCardProps) => {
           alt={course.course_title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-thin">
           <Link
             to={
               isEnrolled
                 ? `/classroom/${course.course_id}`
                 : `/enroll/${course.course_id}`
             }
-            className="btn-primary"
+            className="btn-primary" // Ensure you have this class or use Tailwind classes directly: "bg-secondary text-white px-4 py-2 rounded-lg font-bold"
           >
             {isEnrolled ? "Continue Learning" : "Enroll Now"}
           </Link>

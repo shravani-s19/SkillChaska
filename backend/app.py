@@ -12,7 +12,7 @@ def create_app():
     app = Flask(__name__)
     
     # 1. CORS Setup (Allow Frontend to connect)
-    CORS(app, resources={r"/api/*": {"origins": ["*","http://10.121.245.240:5173/", "https://10.121.245.240:5173/"]}})
+    CORS(app, resources={r"/api/*": {"origins": ["*","http://172.25.80.1:5173/", "https://172.25.80.1:5173/"]}})
 
     # 2. Initialize Firebase
     try:

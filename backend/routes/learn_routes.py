@@ -10,11 +10,6 @@ db = DatabaseManager()
 @learn_bp.route('/<course_id>/<module_id>', methods=['GET'])
 @require_token
 def get_module_content(course_id, module_id):
-    """
-    6. Get Module Content (Player Load)
-    Method: GET
-    Endpoint: /api/learn/<course_id>/<module_id>
-    """
     try:
         # 1. Check Enrollment
         if not db.is_student_enrolled(g.user_uid, course_id):
@@ -22,28 +17,32 @@ def get_module_content(course_id, module_id):
 
         # 2. Get Module Data
         module_data = db.get_module_by_id(course_id, module_id)
-        user_progress = db.get_user_module_progress(g.user_uid, module_id)
+        if not module_data:
+            return jsonify({"status": "error", "message": "Module not found"}), 404
 
-        # 3. Sanitize (Remove correct answer)
+        # 3. Get User Progress (Pass course_id now!)
+        user_progress = db.get_user_module_progress(g.user_uid, course_id, module_id)
+
+        # 4. Sanitize
         sanitized_interactions = []
         for point in module_data.get('module_ai_interaction_points', []):
             sanitized_interactions.append({
                 "interaction_id": point['interaction_id'],
                 "timestamp": point['interaction_timestamp_seconds'],
-                "question": point['interaction_question_text'],
-                "options": point['interaction_options_list']
-                # Correct option REMOVED
+                "interaction_question_text": point['interaction_question_text'], # Fix key name if inconsistent
+                "interaction_options_list": point['interaction_options_list']
             })
 
         return jsonify({
-            "video_url": module_data.get('module_video_url'), # Or Signed URL
+            "video_url": module_data.get('module_media_url'),
             "interaction_points": sanitized_interactions,
             "watched_history": user_progress.get('last_timestamp', 0)
         }), 200
 
     except Exception as e:
+        print(f"Learn Route Error: {e}") # Debug log
         return jsonify({"status": "error", "message": str(e)}), 500
-
+    
 @learn_bp.route('/validate', methods=['POST'])
 @require_token
 def validate_answer():
@@ -91,7 +90,7 @@ def update_heartbeat():
     """
     try:
         data = request.json
-        db.update_watch_time(g.user_uid, data.get('module_id'), data.get('current_timestamp'))
+        # db.update_watch_time(g.user_uid, data.get('module_id'), data.get('current_timestamp'))
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -118,5 +117,35 @@ def get_learning_materials(course_id, module_id):
         }
         
         return jsonify(response_data), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@learn_bp.route('/complete', methods=['POST'])
+@require_token
+def mark_module_complete():
+    """
+    9. Mark Module as Complete
+    Method: POST
+    Payload: { "course_id": "...", "module_id": "..." }
+    """
+    try:
+        data = request.json
+        course_id = data.get('course_id')
+        module_id = data.get('module_id')
+        
+        # Security: Check enrollment
+        if not db.is_student_enrolled(g.user_uid, course_id):
+             return jsonify({"status": "error", "message": "Not enrolled"}), 403
+
+        # Update DB
+        db.mark_module_completed(g.user_uid, course_id, module_id)
+        
+        # Check if this was the last module? (Optional, for UI prompts)
+        is_course_complete = db.check_course_completion(g.user_uid, course_id)
+
+        return jsonify({
+            "status": "success", 
+            "course_completed": is_course_complete
+        }), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

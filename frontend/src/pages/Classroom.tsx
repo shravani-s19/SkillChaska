@@ -47,7 +47,7 @@ const Classroom = () => {
   }, [id, initializeCourse]);
 
   useEffect(() => {
-    if (activeCourseId && activeModuleId) {
+     if (activeCourseId && activeModuleId && activeCourseId !== "" && activeModuleId !== "") {
       const loadModuleContent = async () => {
         try {
           const content = await learnService.getPlayerContent(activeCourseId, activeModuleId);
@@ -65,23 +65,29 @@ const Classroom = () => {
   const currentModule = courseData?.course_modules.find(m => m.module_id === activeModuleId);
 
   // --- FIXED LOGIC HERE ---
-  const handleComplete = () => {
-    if (!courseData || !currentModule) return;
+  const handleComplete = async () => {
+    if (!courseData || !currentModule || !activeCourseId) return;
 
-    // 1. Find index of current module in the REAL course list
-    const currentIndex = courseData.course_modules.findIndex(m => m.module_id === activeModuleId);
-    
-    // 2. Check if there is a next module
-    const hasNextModule = currentIndex !== -1 && currentIndex < courseData.course_modules.length - 1;
+    try {
+      // 1. Call Backend to save progress
+      await learnService.markModuleComplete(activeCourseId, activeModuleId);
 
-    if (hasNextModule) {
-      // 3a. Move to next module
-      const nextModuleId = courseData.course_modules[currentIndex + 1].module_id;
-      completeModule(activeCourseId, activeModuleId, nextModuleId);
-    } else {
-      // 3b. Course Complete! (No next module)
-      completeModule(activeCourseId, activeModuleId, null); // Pass null for nextId
-      navigate(`/completion/${id}`);
+      // 2. Find index of current module
+      const currentIndex = courseData.course_modules.findIndex(m => m.module_id === activeModuleId);
+      const hasNextModule = currentIndex !== -1 && currentIndex < courseData.course_modules.length - 1;
+
+      if (hasNextModule) {
+        // 3a. Move to next module in UI Store
+        const nextModuleId = courseData.course_modules[currentIndex + 1].module_id;
+        completeModule(activeCourseId, activeModuleId, nextModuleId);
+      } else {
+        // 3b. Course Complete! 
+        completeModule(activeCourseId, activeModuleId, null);
+        navigate(`/completion/${id}`);
+      }
+    } catch (error) {
+      console.error("Failed to mark module complete", error);
+      // Optional: Show error toast
     }
   };
 
