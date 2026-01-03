@@ -27,7 +27,7 @@ def ask_ai_tutor():
         # 2. Call Gemini
         
         answer = ai_engine.ask_tutor(context, timestamp, query)
-        
+        print(answer)
         return jsonify({"answer": answer}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

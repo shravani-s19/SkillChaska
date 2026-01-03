@@ -95,3 +95,28 @@ def update_heartbeat():
         return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+@learn_bp.route('/<course_id>/<module_id>/materials', methods=['GET'])
+@require_token
+def get_learning_materials(course_id, module_id):
+    """
+    Returns AI Smart Notes, Flashcards, Mindmaps
+    """
+    try:
+        # Check enrollment first
+        if not db.is_student_enrolled(g.user_uid, course_id):
+            return jsonify({"status": "error", "message": "Not enrolled"}), 403
+            
+        materials = db.get_module_materials(course_id, module_id)
+        
+        # Ensure structure exists even if empty
+        response_data = {
+            "ai_smart_notes": materials.get('ai_smart_notes', []),
+            "ai_flashcards": materials.get('ai_flashcards', []),
+            "ai_mind_map": materials.get('ai_mind_map', {}),
+            "module_resources": materials.get('module_resources', [])
+        }
+        
+        return jsonify(response_data), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

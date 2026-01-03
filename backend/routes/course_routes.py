@@ -5,7 +5,7 @@ from core.security import require_token
 course_bp = Blueprint('course', __name__)
 db = DatabaseManager()
 
-# --- Scope 2: Course Management (Student View) ---
+# backend/routes/course_routes.py
 
 @course_bp.route('', methods=['GET'])
 def get_all_courses():
@@ -14,14 +14,24 @@ def get_all_courses():
     Method: GET
     Endpoint: /api/courses
     Query Params: ?search=python&level=beginner
+    
+    Logic:
+    - If params exist -> Filter result.
+    - If params are missing -> Return ALL published courses.
     """
     search_query = request.args.get('search')
     level = request.args.get('level')
     
     try:
-        # Filter logic should handle None values inside db_manager
+        # Call the DB method (now implemented below)
         courses = db.get_courses_filtered(search_query, level)
-        return jsonify(courses), 200
+        print(courses)
+        return jsonify({
+            "status": "success", 
+            "count": len(courses),
+            "data": courses
+        }), 200
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -74,5 +84,35 @@ def enroll_in_course():
         else:
             return jsonify({"status": "error", "message": "Payment failed"}), 402
             
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# backend/routes/course_routes.py
+
+@course_bp.route('/<course_id>/certificate', methods=['POST'])
+@require_token
+def generate_course_certificate(course_id):
+    """
+    Generate Certificate upon completion
+    """
+    try:
+        # 1. STRICT CHECK: Verify Course Completion
+        is_completed = db.check_course_completion(g.user_uid, course_id)
+        
+        if not is_completed:
+            return jsonify({
+                "status": "error", 
+                "message": "Certificate denied. You have not completed all modules in this course."
+            }), 403
+        
+        # 2. Generate Certificate
+        cert_data = db.generate_certificate(g.user_uid, course_id)
+        
+        return jsonify({
+            "status": "success", 
+            "certificate": cert_data
+        }), 201
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
