@@ -69,7 +69,7 @@ const Classroom = () => {
   if (isLoading || !courseData || !currentModule) return <div className="h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen min-w-[100dvw] bg-background flex flex-col">
       {/* --- Glass Header --- */}
       <header className="h-20 border-b border-white/5 bg-surface/60 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-50">
         <div className="flex items-center gap-6">

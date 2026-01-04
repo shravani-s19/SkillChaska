@@ -70,6 +70,9 @@ def get_course_details(course_id):
                     "module_resource_type": mod.get('module_resource_type'),
                     "module_status": mod.get('module_status'),
                     # REMOVED: module_media_url, module_ai_materials, interaction_points
+                    "module_media_url":mod.get('module_media_url'),
+                    "module_ai_materials": mod.get('module_ai_materials'),
+                    "interaction_points": mod.get('interaction_points'),
                     "is_locked": True 
                 })
             course_data['course_modules'] = sanitized_modules
