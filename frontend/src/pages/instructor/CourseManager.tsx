@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
-// FIX: Import getCourses function, NOT mockCourses array
-import { getCourses } from '../../data/mockInstructorData';
+import { instructorService } from '../../services/instructor.service'; // Import Service
 import { Plus, Search, Filter, MoreVertical, Edit3, Trash2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { CourseEntity } from '../../types';
 
 const CourseManager = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  // FIX: Load courses from the function
-  const [courses, setCourses] = useState(getCourses());
+  const [courses, setCourses] = useState<CourseEntity[]>([]);
 
-  // Ensure we have fresh data every time we visit this page
   useEffect(() => {
-    setCourses(getCourses());
+    // Fetch real courses
+    instructorService.getMyCourses().then(setCourses).catch(console.error);
   }, []);
 
   const filteredCourses = courses.filter(course => 

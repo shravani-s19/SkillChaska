@@ -9,6 +9,7 @@ from routes.instructor_routes import instructor_bp
 from routes.ai_routes import ai_bp
 from routes.achievement_routes import achievement_bp
 from routes.media_routes import media_bp
+from routes.admin_routes import admin_bp 
 
 def create_app():
     app = Flask(__name__)
@@ -31,6 +32,8 @@ def create_app():
     app.register_blueprint(instructor_bp, url_prefix='/api/instructor')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(achievement_bp, url_prefix='/api/achievements')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(media_bp, url_prefix='/api/media') 
 
     # 4. Health Check
     @app.route('/')

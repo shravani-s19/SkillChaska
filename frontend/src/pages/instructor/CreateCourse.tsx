@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Image as ImageIcon, Loader2, UploadCloud, X } from 'lucide-react';
-import { createCourse } from '../../data/mockInstructorData';
+import { ArrowLeft, Save, Image as ImageIcon, Loader2, UploadCloud } from 'lucide-react';
+import { instructorService } from '../../services/instructor.service'; // Import Service
 import { motion } from 'framer-motion';
 
 const CreateCourse = () => {
@@ -15,36 +15,40 @@ const CreateCourse = () => {
     course_description: '',
     course_difficulty: 'Beginner',
     course_price_inr: 4999,
-    course_thumbnail_url: '' // Will store blob URL
+    course_thumbnail_url: '' 
   });
-
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // Handle File Selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Ideally upload image to backend first to get URL, 
+    // for MVP we might just use a placeholder or handle Base64 if backend supports it.
+    // Here we assume backend expects a URL string, so we skip file upload logic for brevity
+    // or assume the user inputs a URL. 
+    // For a real app, use authService.uploadAvatar logic but for course thumbnails.
     const file = e.target.files?.[0];
     if (file) {
-      // Create a local URL for the file to preview it immediately
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewImage(objectUrl);
-      setFormData(prev => ({ ...prev, course_thumbnail_url: objectUrl }));
+        setPreviewImage(URL.createObjectURL(file));
+        // Note: Real upload logic needed here to get a public URL string
+        setFormData({ ...formData, course_thumbnail_url: "https://via.placeholder.com/800" }); 
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    setTimeout(() => {
-      const newCourse = createCourse({
-        ...formData,
-        // Fallback image if user didn't upload one
-        course_thumbnail_url: formData.course_thumbnail_url || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=800'
-      });
-      
-      setLoading(false);
-      navigate(`/instructor/course/${newCourse.course_id}`); 
-    }, 1500);
+    try {
+        const newCourse = await instructorService.createCourse({
+            ...formData,
+            course_modules: []
+        });
+        navigate(`/instructor/course/${newCourse.course_id}`);
+    } catch (error) {
+        console.error("Failed to create course", error);
+        alert("Error creating course");
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (

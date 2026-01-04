@@ -1,17 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { getCourses, instructorStats } from '../../data/mockInstructorData';
+import { instructorService } from '../../services/instructor.service'; // Import Service
 import { Users, DollarSign, BookOpen, TrendingUp, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { CourseEntity } from '../../types';
 
 const InstructorDashboard = () => {
   const navigate = useNavigate();
-  // State to hold dynamic courses
-  const [courses, setCourses] = useState(getCourses());
+  const [courses, setCourses] = useState<CourseEntity[]>([]);
+  const [stats, setStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Refresh data on mount
   useEffect(() => {
-    setCourses(getCourses());
+    const loadData = async () => {
+        try {
+            const [coursesData, statsData] = await Promise.all([
+                instructorService.getMyCourses(),
+                instructorService.getStats()
+            ]);
+            setCourses(coursesData);
+            setStats(statsData);
+        } catch (error) {
+            console.error("Failed to load dashboard", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    loadData();
   }, []);
 
   const getIcon = (label: string) => {
@@ -32,6 +47,8 @@ const InstructorDashboard = () => {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0 }
   };
+  
+  if (loading) return <div className="p-8">Loading Dashboard...</div>;
 
   return (
     <motion.div 
@@ -40,9 +57,8 @@ const InstructorDashboard = () => {
       animate="show"
       className="space-y-8"
     >
-      
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* ... Header Section (Same as original) ... */}
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-3xl font-bold text-text">Dashboard</h1>
             <p className="text-textSecondary mt-1">Overview of your performance and content.</p>
@@ -55,10 +71,10 @@ const InstructorDashboard = () => {
             <Plus size={20} /> Create New Course
         </button>
       </div>
-      
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {instructorStats.map((stat, idx) => {
+        {stats.map((stat, idx) => {
           const Icon = getIcon(stat.label);
           return (
             <motion.div variants={item} key={idx} className="bg-surface p-6 rounded-2xl border border-border shadow-sm hover:border-primary/50 transition-colors group">
@@ -77,7 +93,7 @@ const InstructorDashboard = () => {
         })}
       </div>
 
-      {/* Recent Courses Table */}
+      {/* Recent Courses Table (Using real 'courses' state) */}
       <motion.div variants={item} className="bg-surface rounded-2xl border border-border p-6 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold text-text">Recent Courses</h2>
@@ -92,12 +108,12 @@ const InstructorDashboard = () => {
               <tr>
                 <th className="px-6 py-4 text-left rounded-l-lg">Course Title</th>
                 <th className="px-6 py-4 text-left">Status</th>
-                <th className="px-6 py-4 text-left">Completion</th>
+                <th className="px-6 py-4 text-left">Modules</th>
                 <th className="px-6 py-4 text-right rounded-r-lg">Price</th>
               </tr>
             </thead>
             <tbody className="text-sm text-text">
-              {courses.map((course) => (
+              {courses.slice(0, 5).map((course) => (
                 <tr 
                     key={course.course_id} 
                     className="border-b border-border last:border-0 hover:bg-background/50 transition-colors cursor-pointer group"
@@ -106,11 +122,10 @@ const InstructorDashboard = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-lg bg-background overflow-hidden border border-border">
-                        <img src={course.course_thumbnail_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <img src={course.course_thumbnail_url || 'placeholder.jpg'} alt="" className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <p className="font-bold text-text">{course.course_title}</p>
-                        <p className="text-xs text-textSecondary">{course.course_modules.length} Modules</p>
                       </div>
                     </div>
                   </td>
@@ -120,19 +135,14 @@ const InstructorDashboard = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 h-2 bg-background rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${course.course_progress}%` }}></div>
-                      </div>
-                      <span className="text-xs font-medium text-textSecondary">{course.course_progress}%</span>
-                    </div>
+                    <span className="text-xs font-medium text-textSecondary">{course.course_modules.length} Modules</span>
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-text">₹{course.course_price_inr}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {courses.length === 0 && (
+           {courses.length === 0 && (
               <div className="text-center py-8 text-textSecondary">No courses created yet.</div>
           )}
         </div>

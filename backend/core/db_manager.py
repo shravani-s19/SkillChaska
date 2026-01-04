@@ -401,3 +401,36 @@ class DatabaseManager:
             f"student_learning_progress.{course_id}.last_updated_at": firestore.SERVER_TIMESTAMP
         })
         return True
+    # backend/core/db_manager.py
+
+# ... existing code ...
+
+    # --- Admin Operations ---
+    def get_all_instructors(self):
+        """Fetches all users with role 'instructor'"""
+        docs = self.users_ref.where("role", "==", "instructor").stream()
+        instructors = []
+        for doc in docs:
+            data = doc.to_dict()
+            instructors.append({
+                "id": data.get("instructor_id") or data.get("student_id"), # Handle legacy schema
+                "name": data.get("instructor_full_name") or data.get("student_full_name"),
+                "email": data.get("instructor_email") or data.get("student_email"),
+                "role": "instructor",
+                "joinedDate": data.get("instructor_joined_at", "").split("T")[0] # Format date
+            })
+        return instructors
+
+    def delete_user(self, uid):
+        """Deletes user from Firestore (Auth deletion needs to happen in route)"""
+        self.users_ref.document(uid).delete()
+        return True
+
+    # --- Instructor Specific ---
+    def get_courses_by_instructor(self, instructor_id):
+        """Fetches courses created by a specific instructor"""
+        docs = self.courses_ref.where("course_instructor_id", "==", instructor_id).stream()
+        courses = []
+        for doc in docs:
+            courses.append(doc.to_dict())
+        return courses

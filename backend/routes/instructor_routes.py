@@ -19,62 +19,53 @@ TEMP_DIR = os.path.join(os.getcwd(), 'temp_uploads')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 @instructor_bp.route('/module/upload', methods=['POST'])
-# @require_token
+# @require_token # Uncomment for security
 def upload_media_trigger_ai():
-    """
-    10. Upload Media (Form Data) & Trigger AI
-    Consumes: multipart/form-data
-    """
     try:
-        # 1. Validate File Presence
         if 'file' not in request.files:
             return jsonify({"status": "error", "message": "No file part"}), 400
         
         file = request.files['file']
-        
-        if file.filename == '':
-            return jsonify({"status": "error", "message": "No selected file"}), 400
-
-        # 2. Extract Metadata from Form (Not JSON body anymore!)
         course_id = request.form.get('course_id')
         title = request.form.get('title')
-        m_type = request.form.get('type', 'video') # 'video' or 'document'
-        
-        if not course_id or not title:
-            return jsonify({"status": "error", "message": "Missing course_id or title"}), 400
+        m_type = request.form.get('type', 'video')
 
-        # 3. Save File Locally (Temporary)
-        filename = secure_filename(file.filename)
-        # Unique name to prevent collisions
-        unique_filename = f"{course_id}_{uuid.uuid4().hex[:6]}_{filename}"
-        local_path = os.path.join(TEMP_DIR, unique_filename)
-        
-        print(f"💾 Saving temp file to: {local_path}")
-        file.save(local_path)
-        
-        # 4. Create DB Entry (Status: Processing)
-        new_module = ModuleModel.create_new(title, seq_num=1, resource_type=m_type)
+        if not course_id or not title:
+            return jsonify({"status": "error", "message": "Missing metadata"}), 400
+
+        # 1. Create DB Entry (Status: processing)
+        # Determine sequence number (simple logic: get current count + 1)
+        # For now, we default to 99, assuming frontend or DB logic handles reordering
+        new_module = ModuleModel.create_new(title, seq_num=99, resource_type=m_type)
         new_module['module_status'] = 'processing'
+        
+        # Add to Firestore immediately so it appears in the list
         db.add_module_to_course(course_id, new_module)
         module_id = new_module['module_id']
 
-        # 5. Start Background Thread
-        # We pass the local path so the thread can upload it to Firebase + Gemini
+        # 2. Save Temp File
+        filename = secure_filename(file.filename)
+        unique_filename = f"{uuid.uuid4().hex[:6]}_{filename}"
+        temp_path = os.path.join(TEMP_DIR, unique_filename)
+        file.save(temp_path)
+
+        # 3. Start AI Thread
         thread = threading.Thread(
-        target=ai_engine.process_content_background, 
-        # Pass the original secure filename to be used in the final path
-        args=(course_id, module_id, local_path, secure_filename(file.filename), file.content_type)
+            target=ai_engine.process_content_background,
+            args=(course_id, module_id, temp_path, filename, file.content_type)
         )
         thread.start()
 
         return jsonify({
-            "status": "processing_started", 
+            "status": "success", 
             "module_id": module_id,
-            "message": "File received. Processing in background."
+            "message": "Upload successful. AI processing started."
         }), 200
 
     except Exception as e:
+        print(f"Upload Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+    
 
 # Add this endpoint for Frontend to poll status (fallback if not using Firestore Listeners)
 @instructor_bp.route('/module/<module_id>/status', methods=['GET'])
@@ -141,3 +132,55 @@ def book_mentor_session():
     except Exception as e:
         print(f"Booking Error: {e}") 
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+    # backend/routes/instructor_routes.py
+# ... imports (keep existing) ...
+from schemas.models import CourseModel # Add this import
+
+# ... keep existing /module/upload route ...
+
+@instructor_bp.route('/courses', methods=['GET'])
+@require_token
+def get_my_courses():
+    try:
+        courses = db.get_courses_by_instructor(g.user_uid)
+        return jsonify(courses), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@instructor_bp.route('/courses', methods=['POST'])
+@require_token
+def create_course():
+    try:
+        data = request.json
+        
+        # Create Schema object
+        course_data = CourseModel.create_new(
+            title=data.get('course_title'),
+            description=data.get('course_description'),
+            price=data.get('course_price_inr', 0),
+            instructor_id=g.user_uid
+        )
+        
+        # Add extra fields
+        course_data['course_difficulty'] = data.get('course_difficulty', 'Beginner')
+        course_data['course_thumbnail_url'] = data.get('course_thumbnail_url', '')
+
+        course_id = db.create_course(course_data)
+        
+        # Return full object for frontend
+        return jsonify(course_data), 201
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@instructor_bp.route('/stats', methods=['GET'])
+@require_token
+def get_instructor_stats():
+    # Placeholder for real stats aggregation
+    return jsonify([
+        { "label": "Total Students", "value": "120", "change": "+12%" },
+        { "label": "Total Revenue", "value": "₹45,000", "change": "+5%" },
+        { "label": "Active Courses", "value": "3", "change": "+0%" },
+        { "label": "Avg Rating", "value": "4.8", "change": "+2%" }
+    ]), 200

@@ -2,13 +2,32 @@
 import apiClient from '../lib/axios';
 import { StudentEntity } from '../types';
 
-// --- NEW IMPORTS for Admin ---
-import { 
-    getInstructors as mockGetInstructors, 
-    addInstructor as mockAddInstructor, 
-    deleteInstructor as mockDeleteInstructor, 
-    Instructor 
-} from '../data/mockAdminData';
+import { Instructor } from '../data/mockAdminData'; // Keep for type definition or create new interface
+
+// Update adminService object:
+export const adminService = {
+  loginAdmin: async (email: string, pass: string) => {
+    // Note: Assuming backend returns a token similar to student login
+    const { data } = await apiClient.post('/admin/login', { email, password: pass });
+    // In a real app, store this token separately or handle roles in one auth flow
+    localStorage.setItem('auth_token', data.token); 
+    return data;
+  },
+
+  getInstructors: async (): Promise<Instructor[]> => {
+    const { data } = await apiClient.get('/admin/instructors');
+    return data;
+  },
+
+  addInstructor: async (name: string, email: string): Promise<Instructor> => {
+    const { data } = await apiClient.post('/admin/instructors', { name, email });
+    return data;
+  },
+
+  deleteInstructor: async (id: string): Promise<void> => {
+    await apiClient.delete(`/admin/instructors/${id}`);
+  }
+};
 
 // ===========================================
 //  STUDENT AUTH SERVICE (Existing)
@@ -63,64 +82,5 @@ export const authService = {
     formData.append('file', file);
     const { data } = await apiClient.post<{ avatar_url: string }>('/auth/me/avatar', formData);
     return data.avatar_url;
-  }
-};
-
-
-// ===========================================
-//  ADMIN API SERVICE (New)
-// ===========================================
-export const adminService = {
-  /**
-   * Simulates logging into the admin portal.
-   */
-  loginAdmin: (email: string, pass: string): Promise<{ success: true }> => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // TODO: Replace with a real API call to a protected /admin/login endpoint
-        if (email === 'admin@codemaska.com' && pass === 'adminpassword') {
-          resolve({ success: true });
-        } else {
-          reject(new Error('Invalid admin credentials.'));
-        }
-      }, 1000);
-    });
-  },
-
-  /**
-   * Fetches the list of all instructors.
-   * Your backend will need a protected GET /instructors endpoint for this.
-   */
-  getInstructors: (): Promise<Instructor[]> => {
-    // TODO: Replace with: apiClient.get('/admin/instructors').then(res => res.data)
-    return mockGetInstructors();
-  },
-
-  /**
-   * Registers a new instructor by calling the existing /auth/register endpoint with the correct role.
-   */
-  addInstructor: (name: string, email: string): Promise<Instructor> => {
-    // This is ready to be connected to your Python backend.
-    // Just uncomment the real call and remove the mock call.
-    
-    // --- REAL API CALL (commented out) ---
-    // return apiClient.post('/auth/register', {
-    //   full_name: name,
-    //   email: email,
-    //   password: `default-${Math.random()}`, // Backend should handle password reset flow
-    //   role: 'instructor'
-    // }).then(res => res.data);
-
-    // --- MOCK API CALL (for frontend development) ---
-    return mockAddInstructor(name, email);
-  },
-
-  /**
-   * Deletes an instructor by their ID.
-   * Your backend needs a protected DELETE /instructors/{instructor_id} endpoint.
-   */
-  deleteInstructor: (id: string): Promise<{ success: true }> => {
-    // TODO: Replace with: apiClient.delete(`/admin/instructors/${id}`)
-    return mockDeleteInstructor(id);
   }
 };
