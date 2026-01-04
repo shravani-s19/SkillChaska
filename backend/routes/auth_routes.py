@@ -1,5 +1,4 @@
 # backend/routes/auth_routes.py
-
 import os
 import uuid
 import requests

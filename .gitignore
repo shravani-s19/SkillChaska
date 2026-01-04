@@ -6,5 +6,7 @@ __pycache__/
 code_context.txt
 dist/
 build/
+scripts/
+media_storage/
 sctipts/
 certificates/

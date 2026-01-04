@@ -19,7 +19,7 @@ TEMP_DIR = os.path.join(os.getcwd(), 'temp_uploads')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 @instructor_bp.route('/module/upload', methods=['POST'])
-@require_token
+# @require_token
 def upload_media_trigger_ai():
     """
     10. Upload Media (Form Data) & Trigger AI
@@ -61,15 +61,16 @@ def upload_media_trigger_ai():
         # 5. Start Background Thread
         # We pass the local path so the thread can upload it to Firebase + Gemini
         thread = threading.Thread(
-            target=ai_engine.process_content_background, 
-            args=(course_id, module_id, local_path, m_type, file.content_type)
+        target=ai_engine.process_content_background, 
+        # Pass the original secure filename to be used in the final path
+        args=(course_id, module_id, local_path, secure_filename(file.filename), file.content_type)
         )
         thread.start()
 
         return jsonify({
             "status": "processing_started", 
             "module_id": module_id,
-            "message": "File received. AI is analyzing in background."
+            "message": "File received. Processing in background."
         }), 200
 
     except Exception as e:

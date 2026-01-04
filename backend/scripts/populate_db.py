@@ -1,4 +1,12 @@
+import sys
 import os
+
+# Add the parent directory (backend) to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+# --- Your existing imports go below here ---
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from core.db_manager import DatabaseManager
@@ -6,7 +14,7 @@ from schemas.models import StudentModel, InstructorModel, CourseModel, ModuleMod
 
 # 1. Initialize manually to avoid app.py conflicts
 if not firebase_admin._apps:
-    cred = credentials.Certificate("serviceAccountKey.json")
+    cred = credentials.Certificate("../serviceAccountKey.json")
     firebase_admin.initialize_app(cred)
 
 db_manager = DatabaseManager()
@@ -67,7 +75,7 @@ def populate():
     # Module 1: Video (Variables)
     mod1 = ModuleModel.create_new("Variables & Data Types", 1, "video")
     mod1['module_status'] = "published"
-    mod1['module_media_url'] = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" # Dummy Video
+    mod1['module_media_url'] = "http://192.168.60.1:8000/videoplayback.mp4" # Dummy Video
     
     # Add Dummy AI Quiz
     mod1['module_ai_interaction_points'] = [
