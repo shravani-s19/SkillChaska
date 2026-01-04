@@ -28,10 +28,10 @@ const Profile = () => {
   });
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 min-w-[82dvw]">
       {/* Header / Hero Section */}
       <header className="relative mb-12">
-        <div className="h-48 w-full bg-gradient-to-r from-secondary/20 via-accent/10 to-secondary/20 rounded-[40px] overflow-hidden">
+        <div className="h-48 bg-gradient-to-r from-secondary/20 via-accent/10 to-secondary/20 rounded-[40px] overflow-hidden">
           
         </div>
         
