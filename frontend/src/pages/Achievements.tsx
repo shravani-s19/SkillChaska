@@ -41,7 +41,7 @@ const Achievements = () => {
   // Loading Skeleton
   if (isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen min-w-[82dvw] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -51,7 +51,7 @@ const Achievements = () => {
   const unlockedBadgesCount = badges.filter(b => !b.isLocked).length;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 min-w-[82dvw]">
       <header className="mb-12">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center">

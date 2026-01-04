@@ -24,7 +24,7 @@ const Landing: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0A0A0A] overflow-hidden text-white font-sans selection:bg-[#00BCD4] selection:text-black">
+    <div className="relative min-h-screen min-w-[100dvw] bg-[#0A0A0A] overflow-hidden text-white font-sans selection:bg-[#00BCD4] selection:text-black">
       
       {/* --- Dynamic Background --- */}
       <div className="absolute inset-0 pointer-events-none">
@@ -48,7 +48,7 @@ const Landing: React.FC = () => {
           <div className="bg-gradient-to-br from-[#00BCD4] to-[#B2EBF2] p-2 rounded-lg">
             <Code className="text-black w-5 h-5" strokeWidth={3} />
           </div>
-          <span className="text-xl font-bold tracking-tight">CodeMaska</span>
+          <span className="text-xl font-bold tracking-tight">SkillChaska</span>
         </div>
 
         {/* Links (Hidden on mobile) */}
@@ -103,7 +103,7 @@ const Landing: React.FC = () => {
 
           {/* Subtitle */}
           <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-            CodeMaska uses AI to turn videos into interactive, step-by-step problem-solving experiences. 
+            SkillChaska uses AI to turn videos into interactive, step-by-step problem-solving experiences. 
             No skipping, no passive watching—just pure learning mastery.
           </p>
 

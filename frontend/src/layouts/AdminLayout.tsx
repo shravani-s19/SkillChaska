@@ -13,7 +13,7 @@ const AdminLayout = () => {
           <Shield size={24} className="text-primary" />
           <div>
             <h1 className="font-bold text-lg text-text">Admin Panel</h1>
-            <p className="text-xs text-textSecondary">CodeMaska</p>
+            <p className="text-xs text-textSecondary">SkillChaska</p>
           </div>
         </div>
         <div className="flex-1 p-4">

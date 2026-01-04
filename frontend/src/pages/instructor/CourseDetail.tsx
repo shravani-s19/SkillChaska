@@ -108,7 +108,7 @@ const CourseDetail = () => {
   if (!course) return <div className="p-8">Loading Course...</div>;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 max-w-6xl min-w-[82dvw] mx-auto pb-20">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 min-w-[82dvw] pb-20">
       <button onClick={() => navigate("/instructor/courses")} className="flex items-center gap-2 text-textSecondary hover:text-text transition-colors">
         <ArrowLeft size={18} /> Back to Courses
       </button>

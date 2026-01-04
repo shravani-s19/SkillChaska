@@ -54,7 +54,7 @@ const Courses = () => {
   const featuredCourse = allCourses.length > 0 ? allCourses[0] : null;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 min-w-[84dvw]">
       {/* Featured Hero Section */}
       {isLoading ? (
         // Hero Skeleton

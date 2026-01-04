@@ -25,7 +25,7 @@ const InstructorLayout = () => {
           </div>
           {isSidebarOpen && (
             <div className="animate-fade-in">
-              <h1 className="font-bold text-lg tracking-tight text-text">CodeMaska</h1>
+              <h1 className="font-bold text-lg tracking-tight text-text">SkillChaska</h1>
               <p className="text-[10px] uppercase tracking-wider text-textSecondary font-semibold">Instructor</p>
             </div>
           )}

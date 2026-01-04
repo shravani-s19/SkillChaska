@@ -127,7 +127,7 @@ const Dashboard = () => {
   };
 
   if (!user || loading) return (
-    <div className="h-full min-w-[100dvw] flex items-center justify-center">
+    <div className="h-full min-w-[82dvw] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -157,7 +157,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard delay={0.1} icon={Zap} label="Streak" value={`${user.student_stats.stat_days_streak} Days`} color="text-accent" trend="+1 today" />
         <StatsCard delay={0.2} icon={Clock} label="Learning Time" value={`${user.student_stats.stat_total_watch_time_hours.toFixed(1)}h`} color="text-secondary" />
-        <StatsCard delay={0.3} icon={Trophy} label="Certificates" value={user.student_stats.stat_certificates_earned.length.toString()} color="text-success" />
+        <StatsCard delay={0.3} icon={Trophy} label="Certificates" value={user.student_stats.stat_certificates_earned?.length.toString()} color="text-success" />
         <StatsCard delay={0.4} icon={TrendingUp} label="Total XP" value={user.student_stats.stat_total_xp.toLocaleString()} color="text-purple-500" trend="+450 this week" />
       </div>
 

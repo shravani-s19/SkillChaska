@@ -4,7 +4,7 @@ import { GraduationCap, Presentation, ArrowLeft } from 'lucide-react';
 
 const RoleSelection = () => {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-text relative">
+    <div className="min-h-screen min-w-[100dvw] bg-background flex flex-col items-center justify-center p-4 text-text relative">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 pointer-events-none" />
 
       <Link to="/" className="absolute top-8 left-8 flex items-center gap-2 text-textSecondary hover:text-text transition-colors">
@@ -13,7 +13,7 @@ const RoleSelection = () => {
 
       <div className="bg-surface border border-border rounded-2xl shadow-2xl p-8 max-w-4xl w-full text-center relative z-10">
         <h1 className="text-3xl md:text-4xl font-bold mb-3 text-text">Choose Your Path</h1>
-        <p className="text-textSecondary mb-10">Select your portal to continue to CodeMaska</p>
+        <p className="text-textSecondary mb-10">Select your portal to continue to SkillChaska</p>
         
         <div className="grid md:grid-cols-2 gap-8 max-w-2xl mx-auto">
           {/* Student Card */}
