@@ -1,16 +1,22 @@
+/* File: src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 23 23 23;
-  --surface: 38 38 38;
-  --text: 255 255 255;
-  --text-secondary: 163 163 163;
-  --border: 47 47 47;
+  /* Dark Mode (Default) - slightly richer darks */
+  --background: 15 15 18; /* Darker, slightly blue-tinted black */
+  --surface: 24 24 27;
+  --text: 250 250 250;
+  --text-secondary: 161 161 170;
+  --border: 39 39 42;
+  
+  /* Retaining your logic colors */
   --primary: 178 235 242;
-  --secondary: 0 188 212;
-  --accent: 255 169 50;
+  --secondary: 0 188 212; /* Cyan */
+  --accent: 255 169 50;   /* Orange */
 }
 
 .light {
@@ -28,40 +34,61 @@
   body {
     background-color: rgb(var(--background));
     color: rgb(var(--text));
-    @apply antialiased transition-colors duration-300;
+    @apply antialiased selection:bg-secondary/30 selection:text-secondary;
+    
+    /* Subtle background grid/noise for texture */
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(var(--secondary), 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 0% 50%, rgba(var(--accent), 0.03) 0%, transparent 30%);
+    background-attachment: fixed;
   }
 }
 
-.perspective-1000 {
-  perspective: 1000px;
+@layer components {
+  /* Glassmorphism Utility */
+  .glass {
+    @apply bg-surface/70 backdrop-blur-xl border border-white/10 shadow-xl;
+  }
+  
+  .glass-card {
+    @apply bg-surface/40 backdrop-blur-md border border-white/5 shadow-lg hover:border-white/10 transition-all duration-300;
+  }
+
+  .btn-primary {
+    @apply bg-secondary text-white font-bold px-6 py-3 rounded-xl 
+    hover:opacity-90 hover:shadow-lg hover:shadow-secondary/20 hover:-translate-y-0.5 
+    active:translate-y-0 transition-all duration-200;
+  }
+
+  /* Custom Input Field */
+  .input-field {
+    @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 
+    focus:outline-none focus:border-secondary/50 focus:bg-white/10 focus:ring-1 focus:ring-secondary/50 
+    transition-all duration-300 placeholder:text-textSecondary/40;
+  }
 }
 
-.preserve-3d {
-  transform-style: preserve-3d;
-}
-
-.backface-hidden {
-  backface-visibility: hidden;
-}
-
-.rotate-y-180 {
-  transform: rotateY(180deg);
-}
-
-/* Custom Scrollbar */
+/* Custom Scrollbar - Sleek & Minimal */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(var(--background));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--border));
-  border-radius: 10px;
+  background: rgba(var(--border));
+  border-radius: 20px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--text-secondary) / 0.5);
+  background: rgba(var(--secondary));
 }
+
+/* 3D Utilities */
+.perspective-1000 { perspective: 1000px; }
+.preserve-3d { transform-style: preserve-3d; }
+.backface-hidden { backface-visibility: hidden; }
+.rotate-y-180 { transform: rotateY(180deg); }

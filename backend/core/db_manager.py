@@ -255,51 +255,52 @@ class DatabaseManager:
         
         if not user or not course:
             raise ValueError("User or Course not found")
-
+    
         student_name = user.get('student_full_name', 'Student')
         course_name = course.get('course_title', 'Course')
-        cert_id = generate_id("cert")
+        cert_id = generate_id("cert") # Assuming generate_id is defined helper
         
-        # FIX: Ensure datetime.now() works
+        # FIX: Ensure datetime works
         issue_date = datetime.datetime.now().strftime("%B %d, %Y")
-
-        # 2. Generate HTML
+    
+        # 2. Generate HTML (Assuming get_certificate_html is imported)
         html_content = get_certificate_html(student_name, course_name, issue_date, cert_id)
-
-        # 3. Upload
-        fd, temp_path = tempfile.mkstemp(suffix=".html")
-        public_url = ""
+    
+        # 3. Save Locally on the Server
+        # Use os.getcwd() to ensure we are relative to the running script
+        base_cert_path = os.path.join(os.getcwd(), 'certificates') 
+        cert_dir = os.path.join(base_cert_path, str(uid))
+        
+        os.makedirs(cert_dir, exist_ok=True)  # Create folders if they don't exist
+    
+        cert_filename = f"{cert_id}_cert.html"
+        cert_path = os.path.join(cert_dir, cert_filename)
+    
         try:
-            with os.fdopen(fd, 'w', encoding='utf-8') as tmp:
-                tmp.write(html_content)
-            
-            storage_path = f"certificates/{uid}/{course_id}_cert.html"
-            public_url = upload_file_to_cloud(temp_path, storage_path, "text/html")
+            with open(cert_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"Certificate saved at: {cert_path}")
         except Exception as e:
-            print(f"Upload failed: {e}")
-            # Fallback if cloud storage fails (for local dev)
-            public_url = "https://via.placeholder.com/150"
-            
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
+            print(f"Error saving certificate locally: {e}")
+            raise e
+        
         # 4. Create Record
+        # NOTE: We store the RELATIVE URL. The Frontend must prepend the Backend Host.
         cert_data = {
             "id": cert_id,
             "courseTitle": course_name,
             "issueDate": issue_date,
             "credentialId": cert_id.upper(),
-            "certificateUrl": public_url,
+            "certificateUrl": f"/certificates/{uid}/{cert_filename}", 
             "thumbnail": "https://cdn-icons-png.flaticon.com/512/2912/2912761.png"
         }
-
-        # 5. Save
+    
+        # 5. Save to Firebase
         self.users_ref.document(uid).update({
             "student_stats.stat_certificates_earned": firestore.ArrayUnion([cert_id])
         })
         self.db.collection('certificates').document(cert_id).set(cert_data)
-
+    
         return cert_data
     
     def check_course_completion(self, uid, course_id):
