@@ -1,27 +1,45 @@
+// File: src/components/AuthGuard.tsx
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 
 export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // 1. Check Auth on Mount
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
+  // 2. Handle Redirects after loading finishes
   useEffect(() => {
-    // Small delay to allow checkAuth to run, or check if we are definitely not authed
-    const isLocalLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-    
-    if (!isLocalLoggedIn && !isAuthenticated) {
-        // Redirect to login (assuming your teammate makes /login)
-        // For now, we might just alert or redirect to a placeholder
-        console.log("User not logged in - Redirecting to /login");
-        // navigate('/login'); 
+    if (!isLoading && !isAuthenticated) {
+      console.log("Unauthorized access attempt. Redirecting to login...");
+      // Pass the current location to redirect back after login
+      navigate('/login', { state: { from: location }, replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isLoading, isAuthenticated, navigate, location]);
 
-  // If we wanted to be strict, we would return null here until auth is checked
+  // 3. Show Loading Spinner while verifying token
+  if (isLoading) {
+    return (
+      <div className="min-h-screen min-w-[100dvw] flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
+          <p className="text-textSecondary text-sm font-medium animate-pulse">Verifying Access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. If not authenticated (and not loading), don't render children
+  // The useEffect above will handle the redirect.
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // 5. Render Protected Content
   return <>{children}</>;
 };

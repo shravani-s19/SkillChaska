@@ -9,7 +9,9 @@ def initialize_firebase():
             raise FileNotFoundError(f"Missing {Config.FIREBASE_CRED_PATH}. Download it from Firebase Console.")
             
         cred = credentials.Certificate(Config.FIREBASE_CRED_PATH)
-        firebase_admin.initialize_app(cred)
+        firebase_admin.initialize_app(cred, {
+            'storageBucket': Config.FIREBASE_STORAGE_BUCKET 
+        })
 
 def get_db():
     return firestore.client()

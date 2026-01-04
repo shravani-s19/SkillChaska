@@ -211,30 +211,6 @@ class DatabaseManager:
             }
         ]
 
-    def generate_certificate(self, uid, course_id):
-        # 1. Verify Completion (Mock logic: assume if requested, it's valid or check progress)
-        course = self.get_course_full(course_id)
-        user = self.get_user(uid)
-        
-        cert_id = generate_id("cert")
-        cert_data = {
-            "id": cert_id,
-            "courseTitle": course.get('course_title', 'Unknown Course'),
-            "issueDate": datetime.now().strftime("%Y-%m-%d"),
-            "credentialId": f"CM-{cert_id.upper()}",
-            "thumbnail": "https://via.placeholder.com/600x400?text=Certificate+of+Completion" # Placeholder
-        }
-        
-        # Save to user stats
-        self.users_ref.document(uid).update({
-            "student_stats.stat_certificates_earned": firestore.ArrayUnion([cert_id])
-        })
-        
-        # Ideally store full cert details in a 'certificates' collection
-        self.db.collection('certificates').document(cert_id).set(cert_data)
-        
-        return cert_data
-
     def get_certificates_by_ids(self, cert_ids):
         certs = []
         for cid in cert_ids:
@@ -243,6 +219,35 @@ class DatabaseManager:
                 certs.append(doc.to_dict())
         return certs
     
+    def get_user_module_progress(self, uid, course_id, module_id):
+        """
+        Retrieves resume progress for a specific module based on
+        StudentEntity.student_learning_progress schema.
+        """
+        user_doc = self.users_ref.document(uid).get()
+        if not user_doc.exists:
+            return {"last_timestamp": 0}
+
+        data = user_doc.to_dict() or {}
+
+        progress_map = data.get("student_learning_progress", {})
+        course_progress = progress_map.get(course_id)
+
+        # No progress recorded for this course
+        if not course_progress:
+            return {"last_timestamp": 0}
+
+        last_module_id = course_progress.get("last_accessed_module_id")
+        last_timestamp = course_progress.get("last_timestamp_seconds", 0)
+
+        # Only resume if the requested module matches last accessed module
+        if last_module_id == module_id:
+            return {"last_timestamp": int(last_timestamp)}
+
+        return {"last_timestamp": 0}
+
+
+        # --- Fix Certificate Generation (Datetime issue) ---
     def generate_certificate(self, uid, course_id):
         # 1. Fetch Data
         user = self.get_user(uid)
@@ -250,122 +255,149 @@ class DatabaseManager:
         
         if not user or not course:
             raise ValueError("User or Course not found")
-
+    
         student_name = user.get('student_full_name', 'Student')
         course_name = course.get('course_title', 'Course')
-        cert_id = generate_id("cert")
-        issue_date = datetime.now().strftime("%B %d, %Y")
-
-        # 2. Generate HTML String
+        cert_id = generate_id("cert") # Assuming generate_id is defined helper
+        
+        # FIX: Ensure datetime works
+        issue_date = datetime.datetime.now().strftime("%B %d, %Y")
+    
+        # 2. Generate HTML (Assuming get_certificate_html is imported)
         html_content = get_certificate_html(student_name, course_name, issue_date, cert_id)
-
-        # 3. Save to Temporary HTML File
-        # We use a temp file because your file_handler expects a file path
-        fd, temp_path = tempfile.mkstemp(suffix=".html")
+    
+        # 3. Save Locally on the Server
+        # Use os.getcwd() to ensure we are relative to the running script
+        base_cert_path = os.path.join(os.getcwd(), 'certificates') 
+        cert_dir = os.path.join(base_cert_path, str(uid))
+        
+        os.makedirs(cert_dir, exist_ok=True)  # Create folders if they don't exist
+    
+        cert_filename = f"{cert_id}_cert.html"
+        cert_path = os.path.join(cert_dir, cert_filename)
+    
         try:
-            with os.fdopen(fd, 'w', encoding='utf-8') as tmp:
-                tmp.write(html_content)
-            
-            # 4. Upload to Firebase Storage
-            storage_path = f"certificates/{uid}/{course_id}_cert.html"
-            public_url = upload_file_to_cloud(temp_path, storage_path, "text/html")
-            
-        finally:
-            # Cleanup temp file
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
-        # 5. Create Certificate Record
+            with open(cert_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"Certificate saved at: {cert_path}")
+        except Exception as e:
+            print(f"Error saving certificate locally: {e}")
+            raise e
+        
+        # 4. Create Record
+        # NOTE: We store the RELATIVE URL. The Frontend must prepend the Backend Host.
         cert_data = {
             "id": cert_id,
             "courseTitle": course_name,
             "issueDate": issue_date,
             "credentialId": cert_id.upper(),
-            "certificateUrl": public_url, # <--- The URL Frontend needs
-            "thumbnail": "https://cdn-icons-png.flaticon.com/512/2912/2912761.png" # Generic Icon for UI list
+            "certificateUrl": f"/certificates/{uid}/{cert_filename}", 
+            "thumbnail": "https://cdn-icons-png.flaticon.com/512/2912/2912761.png"
         }
-
-        # 6. Save Metadata to Firestore
-        # Add to User Profile
+    
+        # 5. Save to Firebase
         self.users_ref.document(uid).update({
             "student_stats.stat_certificates_earned": firestore.ArrayUnion([cert_id])
         })
-        
-        # Save independent Cert document
         self.db.collection('certificates').document(cert_id).set(cert_data)
-
+    
         return cert_data
     
     def check_course_completion(self, uid, course_id):
         """
         Validates if the user has completed all modules in a course.
-        Returns: Boolean
         """
         # 1. Get Course to count total modules
         course = self.get_course_full(course_id)
         if not course:
+            print(f"❌ Course {course_id} not found")
             return False
+            
         course_modules = course.get('course_modules', [])
         total_modules_count = len(course_modules)
         
         if total_modules_count == 0:
-            return False # Empty course cannot be "completed" for certificate
-
-        # 2. Get User Progress
-        user = self.get_user(uid)
-        if not user:
             return False
 
+        # 2. Get User Progress (FORCE FRESH FETCH)
+        # We access the document directly to ensure we aren't using cached data
+        user_doc = self.users_ref.document(uid).get()
+        if not user_doc.exists:
+            print(f"❌ User {uid} not found")
+            return False
+            
+        user_data = user_doc.to_dict()
+
         # 3. Retrieve Progress Data
-        # Access: student_learning_progress -> course_id -> completed_modules (List)
-        progress_map = user.get('student_learning_progress', {})
+        progress_map = user_data.get('student_learning_progress', {})
         course_progress = progress_map.get(course_id, {})
         
+        # Get the list of completed module IDs
         completed_modules_list = course_progress.get('completed_modules', [])
         
         # 4. Compare
-        # We use a set to ensure unique module IDs are counted
         unique_completed = set(completed_modules_list)
         
-        # Check if user has completed at least as many modules as exist in the course
+        print(f"🔍 DEBUG: Course {course_id} | Total: {total_modules_count} | User Completed: {len(unique_completed)}")
+        
+        # Logic: If user completed >= total modules, they pass.
         if len(unique_completed) >= total_modules_count:
             return True
-        print(f"Completed Modules: {len(unique_completed)} / {total_modules_count}")
+            
         return False
-    
-    def get_courses_filtered(self, search_query=None, level=None):
-    # Only get published courses
-        query = self.courses_ref.where("course_is_published", "==", True)
 
-        docs = query.stream()  # Now filtered on server-side
+    def get_courses_filtered(self, search_query=None, level=None, uid=None):
+        """
+        Fetches courses and injects 'course_progress' if a uid is provided.
+        """
+        query = self.courses_ref.where("course_is_published", "==", True)
+        docs = query.stream()
+
+        # 1. If User ID provided, fetch their progress map
+        user_progress_map = {}
+        if uid:
+            user = self.get_user(uid)
+            if user:
+                user_progress_map = user.get('student_learning_progress', {})
 
         results = []
         for doc in docs:
             data = doc.to_dict()
+            c_id = data.get('course_id')
+            
+            # 2. Calculate Progress dynamically
+            progress_percent = 0
+            if uid and c_id in user_progress_map:
+                completed_modules = user_progress_map[c_id].get('completed_modules', [])
+                total_modules = len(data.get('course_modules', []))
+                if total_modules > 0:
+                    progress_percent = int((len(completed_modules) / total_modules) * 100)
 
-            # Apply additional client-side filters if needed
-            if level:
-                course_lvl = data.get('course_level', '').lower()
-                if course_lvl != level.lower():
-                    continue
-
-            if search_query:
-                query_lower = search_query.lower()
-                title = data.get('course_title', '').lower()
-                desc = data.get('course_description', '').lower()
-                if query_lower not in title and query_lower not in desc:
-                    continue
-
-            # Format output (add any missing fields like course_level if you plan to use it)
             results.append({
-                "course_id": data.get('course_id'),
+                "course_id": c_id,
                 "course_title": data.get('course_title'),
                 "course_description": data.get('course_description'),
                 "course_price_inr": data.get('course_price_inr'),
                 "course_instructor_id": data.get('course_instructor_id'),
                 "course_thumbnail_url": data.get('course_thumbnail_url', ''),
-                "course_level": data.get('course_level', 'Beginner'),  # will default if missing
-                "course_total_modules": len(data.get('course_modules', []))
+                "course_level": data.get('course_level', 'Beginner'),
+                "course_difficulty": data.get('course_level', 'Beginner'), # Map level to difficulty
+                "course_total_modules": len(data.get('course_modules', [])),
+                "course_progress": progress_percent # <--- Injected Real Data
             })
 
         return results
+
+    def mark_module_completed(self, uid, course_id, module_id):
+        """
+        Explicitly adds module_id to the completed_modules array.
+        """
+        user_ref = self.users_ref.document(uid)
+        key = f"student_learning_progress.{course_id}.completed_modules"
+        
+        # Use ArrayUnion to add unique values only
+        user_ref.update({
+            key: firestore.ArrayUnion([module_id]),
+            f"student_learning_progress.{course_id}.last_updated_at": firestore.SERVER_TIMESTAMP
+        })
+        return True

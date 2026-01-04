@@ -1,7 +1,12 @@
+// File: src/components/Classroom/AIChat.tsx
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Bot, Sparkles } from 'lucide-react';
-import { api } from '../../services/api';
+import { Send, X, Bot, Sparkles, Copy, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'; // Dark theme for code
+import { learnService } from '../../services/learn.service';
 import { cn } from '../../lib/utils';
 
 interface Message {
@@ -59,16 +64,16 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
     setIsLoading(true);
 
     try {
-      // We pass the current timestamp so the AI knows "where" the user is
-      const result = await api.learn.getAiResponse(
-        input, 
-        `${moduleContext} (at timestamp ${formatTime(currentTimestamp)})`
+      const data = await learnService.askAI(
+        currentTimestamp,
+        moduleContext,
+        input
       );
       
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: result.response,
+        content: data.answer,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, aiMsg]);
@@ -77,7 +82,7 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I'm having trouble connecting to the server right now. Please try again.",
+        content: "I'm having trouble connecting to the brain right now. Please check your connection and try again.",
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -94,7 +99,7 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed right-0 top-16 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl backdrop-blur-sm"
+          className="fixed right-0 top-20 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl backdrop-blur-sm"
         >
           {/* Header */}
           <div className="p-4 border-b border-border flex items-center justify-between bg-surface/95">
@@ -120,15 +125,60 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
             {messages.map((msg) => (
               <div key={msg.id} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
                 <div className={cn(
-                  "max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm",
+                  "max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden",
                   msg.role === 'user' 
                     ? "bg-secondary text-white rounded-tr-none" 
                     : "bg-white/5 border border-white/10 rounded-tl-none"
                 )}>
-                  {msg.content}
+                  {/* Markdown Renderer */}
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      // Custom Code Block Renderer
+                      code({node, className, children, ...props}) {
+                        const match = /language-(\w+)/.exec(className || '');
+                        const isInline = !match && !String(children).includes('\n');
+                        
+                        return !isInline ? (
+                          <div className="my-2 rounded-lg overflow-hidden border border-white/10">
+                            <SyntaxHighlighter
+                              style={vscDarkPlus}
+                              language={match?.[1]}
+                              PreTag="div"
+                              customStyle={{ margin: 0, padding: '1rem', fontSize: '0.8rem' }}
+                              {...props}
+                            >
+                              {String(children).replace(/\n$/, '')}
+                            </SyntaxHighlighter>
+                          </div>
+                        ) : (
+                          <code className="bg-black/20 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                      // Customizing other elements to fit the chat bubble
+                      ul: ({children}) => <ul className="list-disc pl-4 my-2 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal pl-4 my-2 space-y-1">{children}</ol>,
+                      li: ({children}) => <li className="pl-1">{children}</li>,
+                      p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                      a: ({href, children}) => (
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                          {children}
+                        </a>
+                      ),
+                      h1: ({children}) => <h1 className="text-lg font-bold my-2">{children}</h1>,
+                      h2: ({children}) => <h2 className="text-base font-bold my-2">{children}</h2>,
+                      h3: ({children}) => <h3 className="text-sm font-bold my-1">{children}</h3>,
+                      blockquote: ({children}) => <blockquote className="border-l-2 border-white/30 pl-3 my-2 italic opacity-80">{children}</blockquote>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
                 </div>
               </div>
             ))}
+            
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-none">
