@@ -51,7 +51,7 @@ class AIEngine:
                 relative_url_path = save_file_locally(local_file_path, course_id, module_id, original_filename)
                 
                 # Using 127.0.0.1 for local testing, update to your specific IP if needed
-                full_url = f"http://127.0.0.1:5000{relative_url_path}"
+                full_url = f"http://127.0.0.1:5000/api{relative_url_path}"
                 db.update_module_video_url(course_id, module_id, full_url)
                 
                 final_local_path = os.path.join(os.getcwd(), 'media_storage', course_id, module_id, original_filename)
@@ -72,7 +72,7 @@ class AIEngine:
                 temp_files_to_delete.append(video_path)
                 
                 relative_v_path = save_file_locally(video_path, course_id, module_id, f"{module_id}_lecture.mp4")
-                full_video_url = f"http://127.0.0.1:5000{relative_v_path}"
+                full_video_url = f"http://127.0.0.1:5000/api{relative_v_path}"
                 db.update_module_video_url(course_id, module_id, full_video_url)
                 
                 final_video_path = os.path.join(os.getcwd(), 'media_storage', course_id, module_id, f"{module_id}_lecture.mp4")

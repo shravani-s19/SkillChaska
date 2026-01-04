@@ -6,6 +6,7 @@ export const learnService = {
     const { data } = await apiClient.get<PlayerContentResponse>(
       `/learn/${courseId}/${moduleId}`
     );
+    console.log("Player Content Data:", data);
     return data;
   },
 

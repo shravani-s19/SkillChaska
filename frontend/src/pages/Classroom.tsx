@@ -40,17 +40,8 @@ const Classroom = () => {
     }
   }, [id, initializeCourse]);
 
-  useEffect(() => {
-     if (activeCourseId && activeModuleId) {
-        learnService.getPlayerContent(activeCourseId, activeModuleId).then(data => {
-            setVideoUrl(data.video_url);
-            setInteractionPoints(data.interaction_points);
-            setServerResumeTime(data.watched_history);
-        }).catch(console.error);
-    }
-  }, [activeCourseId, activeModuleId]);
-
   const currentModule = courseData?.course_modules.find(m => m.module_id === activeModuleId);
+  const VideoUrl = courseData?.course_modules.find(m => m.module_id === activeModuleId)?.module_media_url || '';
 
   const handleComplete = async () => {
     if (!courseData || !currentModule || !activeCourseId) return;
@@ -117,7 +108,7 @@ const Classroom = () => {
                   key={activeModuleId} 
                   courseId={activeCourseId}
                   moduleId={activeModuleId}
-                  videoUrl={videoUrl} 
+                  videoUrl={VideoUrl} 
                   interactionPoints={interactionPoints} 
                   initialStartTime={serverResumeTime} 
                   onTimeUpdate={setCurrentTime} 

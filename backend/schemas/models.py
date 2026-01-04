@@ -55,7 +55,7 @@ class CourseModel:
             "course_price_inr": price,
             "course_instructor_id": instructor_id,
             "course_created_at": get_utc_now(),
-            "course_is_published": False,
+            "course_is_published": True,
             "course_modules": [] 
         }
 
