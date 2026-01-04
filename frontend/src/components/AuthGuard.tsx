@@ -25,7 +25,7 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   // 3. Show Loading Spinner while verifying token
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen min-w-[100dvw] flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
           <p className="text-textSecondary text-sm font-medium animate-pulse">Verifying Access...</p>

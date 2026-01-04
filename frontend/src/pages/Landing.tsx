@@ -61,7 +61,7 @@ const Landing: React.FC = () => {
 
         {/* Auth Buttons */}
         <div className="flex items-center space-x-6">
-          <Link to="/login" className="text-sm font-medium hover:text-[#00BCD4] transition-colors">
+          <Link to="/get-started" className="text-sm font-medium hover:text-[#00BCD4] transition-colors">
             Sign In
           </Link>
           <button 

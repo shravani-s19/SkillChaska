@@ -41,4 +41,15 @@ export const learnService = {
     );
     return data;
   },
+
+  markModuleComplete: async (courseId: string, moduleId: string) => {
+    const { data } = await apiClient.post<{ status: string; course_completed: boolean }>(
+      '/learn/complete', 
+      {
+        course_id: courseId,
+        module_id: moduleId,
+      }
+    );
+    return data;
+  },
 };

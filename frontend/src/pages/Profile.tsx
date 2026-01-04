@@ -32,7 +32,7 @@ const Profile = () => {
       {/* Header / Hero Section */}
       <header className="relative mb-12">
         <div className="h-48 w-full bg-gradient-to-r from-secondary/20 via-accent/10 to-secondary/20 rounded-[40px] overflow-hidden">
-          <div className="absolute inset-0 backdrop-blur-3xl opacity-50" />
+          
         </div>
         
         <div className="px-8 -mt-16 flex flex-col md:flex-row items-end gap-6">

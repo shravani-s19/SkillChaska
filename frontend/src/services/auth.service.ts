@@ -38,10 +38,11 @@ export const authService = {
   },
 
   // 2. Login (for students/instructors)
-  login: async (email: string, password: string) => {
+  login: async (email: string, password: string, role: string) => {
     const { data } = await apiClient.post<LoginResponse>('/auth/login', {
       email,
-      password
+      password,
+      role,
     });
     return data;
   },

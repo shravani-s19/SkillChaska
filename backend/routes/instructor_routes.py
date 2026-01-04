@@ -1,7 +1,6 @@
 # backend/routes/instructor_routes.py
 import os
 import threading
-import tempfile
 import uuid
 from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, g
@@ -9,6 +8,7 @@ from core.db_manager import DatabaseManager
 from core.security import require_token
 from services.ai_engine import AIEngine
 from schemas.models import ModuleModel
+from datetime import datetime # <--- Ensure this is imported at the top
 
 instructor_bp = Blueprint('instructor', __name__)
 db = DatabaseManager()
@@ -86,3 +86,57 @@ def get_processing_status(module_id):
     if status.exists:
         return jsonify(status.to_dict()), 200
     return jsonify({"status": "unknown"}), 404
+
+# --- LIVE SESSIONS ---
+
+@instructor_bp.route('/sessions', methods=['GET'])
+@require_token
+def get_student_sessions():
+    try:
+        # Query bookings for this student
+        bookings_ref = db.db.collection('bookings').where('student_id', '==', g.user_uid).stream()
+        
+        user_sessions = []
+        for doc in bookings_ref:
+            data = doc.to_dict()
+            user_sessions.append(data)
+            
+        return jsonify(user_sessions), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@instructor_bp.route('/book-session', methods=['POST'])
+@require_token
+def book_mentor_session():
+    """
+    Book a 1:1 session
+    """
+    try:
+        data = request.json
+        topic = data.get('topic')
+        date_str = data.get('date') # e.g. "2024-03-25 10:00 AM"
+        mentor_name = data.get('mentor_name', 'Dr. Angela Yu')
+
+        # FIX: Generate a real string for the timestamp
+        created_at_iso = datetime.utcnow().isoformat()
+
+        booking_data = {
+            "id": str(uuid.uuid4()),
+            "student_id": g.user_uid,
+            "title": f"1:1 Mentorship: {topic}",
+            "time": date_str,
+            "type": "Mentorship",
+            "mentor": mentor_name,
+            "status": "confirmed",
+            "created_at": created_at_iso # <--- Use string, NOT firestore.SERVER_TIMESTAMP
+        }
+
+        # Save to DB
+        db.db.collection('bookings').add(booking_data)
+
+        # Now this dictionary is safe to return as JSON
+        return jsonify({"status": "success", "booking": booking_data}), 201
+
+    except Exception as e:
+        print(f"Booking Error: {e}") 
+        return jsonify({"status": "error", "message": str(e)}), 500

@@ -1,6 +1,7 @@
+// File: src/pages/Classroom.tsx
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, MessageSquare } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Sparkles } from 'lucide-react';
 import { VideoPlayer } from '../components/Classroom/VideoPlayer';
 import { LearningHub } from '../components/Classroom/LearningHub';
 import { Syllabus } from '../components/Classroom/Syllabus';
@@ -17,126 +18,101 @@ const Classroom = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [courseData, setCourseData] = useState<CourseEntity | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [interactionPoints, setInteractionPoints] = useState<InteractionPoint[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [serverResumeTime, setServerResumeTime] = useState(0);
 
-  const { 
-    initializeCourse, 
-    completeModule, 
-    activeModuleId, 
-    activeCourseId
-  } = useProgressStore();
+  const { initializeCourse, completeModule, activeModuleId, activeCourseId } = useProgressStore();
 
   useEffect(() => {
     if (id) {
-      const init = async () => {
-        setIsLoading(true);
-        try {
-          await initializeCourse(id);
-          const data = await courseService.getById(id);
-          setCourseData(data);
-        } catch (error) {
-          console.error("Failed to load course", error);
-        }
-        setIsLoading(false);
-      };
-      init();
+        const init = async () => {
+            setIsLoading(true);
+            try {
+                await initializeCourse(id);
+                const data = await courseService.getById(id);
+                setCourseData(data);
+            } catch (e) { console.error(e); }
+            setIsLoading(false);
+        };
+        init();
     }
   }, [id, initializeCourse]);
 
   useEffect(() => {
-    if (activeCourseId && activeModuleId) {
-      const loadModuleContent = async () => {
-        try {
-          const content = await learnService.getPlayerContent(activeCourseId, activeModuleId);
-          setVideoUrl(content.video_url);
-          setInteractionPoints(content.interaction_points);
-          setServerResumeTime(content.watched_history);
-        } catch (error) {
-          console.error("Failed to load module content", error);
-        }
-      };
-      loadModuleContent();
+     if (activeCourseId && activeModuleId) {
+        learnService.getPlayerContent(activeCourseId, activeModuleId).then(data => {
+            setVideoUrl(data.video_url);
+            setInteractionPoints(data.interaction_points);
+            setServerResumeTime(data.watched_history);
+        }).catch(console.error);
     }
   }, [activeCourseId, activeModuleId]);
 
   const currentModule = courseData?.course_modules.find(m => m.module_id === activeModuleId);
 
-  // --- FIXED LOGIC HERE ---
-  const handleComplete = () => {
-    if (!courseData || !currentModule) return;
-
-    // 1. Find index of current module in the REAL course list
-    const currentIndex = courseData.course_modules.findIndex(m => m.module_id === activeModuleId);
-    
-    // 2. Check if there is a next module
-    const hasNextModule = currentIndex !== -1 && currentIndex < courseData.course_modules.length - 1;
-
-    if (hasNextModule) {
-      // 3a. Move to next module
-      const nextModuleId = courseData.course_modules[currentIndex + 1].module_id;
-      completeModule(activeCourseId, activeModuleId, nextModuleId);
-    } else {
-      // 3b. Course Complete! (No next module)
-      completeModule(activeCourseId, activeModuleId, null); // Pass null for nextId
-      navigate(`/completion/${id}`);
-    }
+  const handleComplete = async () => {
+    if (!courseData || !currentModule || !activeCourseId) return;
+    try {
+        await learnService.markModuleComplete(activeCourseId, activeModuleId);
+        const currentIndex = courseData.course_modules.findIndex(m => m.module_id === activeModuleId);
+        if (currentIndex < courseData.course_modules.length - 1) {
+            completeModule(activeCourseId, activeModuleId, courseData.course_modules[currentIndex + 1].module_id);
+        } else {
+            completeModule(activeCourseId, activeModuleId, null);
+            navigate(`/completion/${id}`);
+        }
+    } catch (e) { console.error(e); }
   };
 
-  if (isLoading || !courseData || !currentModule) {
-    return (
-      <div className="min-h-screen min-w-[100dvw] flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (isLoading || !courseData || !currentModule) return <div className="h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-secondary border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen min-w-[100dvw] bg-background flex flex-col">
-      <header className="h-16 border-b border-border bg-surface/50 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-40">
-        <div className="flex items-center gap-4">
-          <Link to="/dashboard" className="p-2 hover:bg-white/5 rounded-lg text-textSecondary hover:text-text">
-            <ChevronLeft className="w-5 h-5" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* --- Glass Header --- */}
+      <header className="h-20 border-b border-white/5 bg-surface/60 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-50">
+        <div className="flex items-center gap-6">
+          <Link to="/dashboard" className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all group">
+            <ChevronLeft className="w-5 h-5 text-textSecondary group-hover:text-white" />
           </Link>
-          <div className="h-6 w-px bg-border" />
           <div>
-            <h1 className="font-bold text-sm hidden sm:block">{courseData.course_title}</h1>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold bg-secondary/10 text-secondary px-1.5 py-0.5 rounded uppercase tracking-wider">
-                Module {currentModule.module_sequence_number}
-              </span>
-              <p className="text-xs text-textSecondary truncate max-w-[200px]">{currentModule.module_title}</p>
-            </div>
+            <h1 className="font-bold text-lg leading-tight">{courseData.course_title}</h1>
+            <p className="text-sm text-textSecondary flex items-center gap-2 mt-0.5">
+               <span className="w-1.5 h-1.5 bg-secondary rounded-full" />
+               Module {currentModule.module_sequence_number}: <span className="text-white">{currentModule.module_title}</span>
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        
+        <div className="flex items-center gap-4">
           <button 
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-surface border border-border hover:bg-white/5"
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                isChatOpen 
+                ? 'bg-secondary/10 border-secondary/50 text-secondary shadow-[0_0_15px_rgba(var(--secondary),0.2)]' 
+                : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+            }`}
           >
-            <MessageSquare className="w-4 h-4" />
-            <span className="hidden sm:inline">AI Tutor</span>
+            {isChatOpen ? <Sparkles className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+            AI Tutor
           </button>
           
           <button 
             onClick={handleComplete}
-            className="ml-2 bg-secondary text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 shadow-lg shadow-secondary/20"
+            className="btn-primary py-2.5 text-sm shadow-lg shadow-secondary/20"
           >
-            {/* Dynamic Button Text */}
-            {courseData.course_modules.findIndex(m => m.module_id === activeModuleId) === courseData.course_modules.length - 1 
-              ? "Finish Course" 
-              : "Next Lesson"}
+            Next Lesson
           </button>
         </div>
       </header>
 
+      {/* --- Main Content --- */}
       <div className="flex-1 flex overflow-hidden relative">
-        <main className={`flex-1 overflow-y-auto p-4 lg:p-8 transition-all duration-300 ${isChatOpen ? 'lg:mr-96' : ''}`}>
-          <div className="max-w-[1600px] mx-auto">
+        <main className={`flex-1 overflow-y-auto transition-all duration-300 ${isChatOpen ? 'pr-[400px]' : ''}`}>
+          <div className="max-w-[1800px] mx-auto p-8">
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
-              <div className="xl:col-span-3 space-y-6">
+              <div className="xl:col-span-3 space-y-8">
                 <VideoPlayer 
                   key={activeModuleId} 
                   courseId={activeCourseId}
@@ -144,8 +120,8 @@ const Classroom = () => {
                   videoUrl={videoUrl} 
                   interactionPoints={interactionPoints} 
                   initialStartTime={serverResumeTime} 
-                  onTimeUpdate={(time) => setCurrentTime(time)} 
-                  onComplete={handleComplete} // Updated Handler
+                  onTimeUpdate={setCurrentTime} 
+                  onComplete={handleComplete}
                 />
                 <LearningHub />
               </div>
@@ -155,7 +131,7 @@ const Classroom = () => {
             </div>
           </div>
         </main>
-
+        
         <AIChat 
           isOpen={isChatOpen} 
           onClose={() => setIsChatOpen(false)}

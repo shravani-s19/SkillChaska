@@ -99,7 +99,7 @@ export const AIChat = ({ isOpen, onClose, currentTimestamp, moduleContext }: AIC
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="fixed right-0 top-16 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl backdrop-blur-sm"
+          className="fixed right-0 top-20 bottom-0 w-96 bg-surface border-l border-border z-30 flex flex-col shadow-2xl backdrop-blur-sm"
         >
           {/* Header */}
           <div className="p-4 border-b border-border flex items-center justify-between bg-surface/95">

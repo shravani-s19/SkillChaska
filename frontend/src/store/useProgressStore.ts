@@ -22,8 +22,8 @@ interface ProgressState {
 export const useProgressStore = create<ProgressState>()(
   persist(
     (set, get) => ({
-      activeCourseId: "py-adv-01",
-      activeModuleId: "mod_01",
+      activeCourseId: "", // <--- Empty string instead of bad ID
+      activeModuleId: "", // <--- Empty string instead of bad ID
       learningProgress: USER_DATA.student_learning_progress,
 
       initializeCourse: (courseId) => {

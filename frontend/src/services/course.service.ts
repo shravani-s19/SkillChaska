@@ -1,6 +1,12 @@
 import apiClient from '../lib/axios';
 import { CourseEntity } from '../types';
 
+const getBaseUrl = () => {
+  const baseURL = apiClient.defaults.baseURL || '';
+  // If baseURL is "http://localhost:5000/api", we want "http://localhost:5000"
+  return baseURL.replace('/api', '');
+};
+
 export const courseService = {
   getAll: async () => {
     const { data } = await apiClient.get<{data: CourseEntity[]}>('/course');
@@ -13,8 +19,20 @@ export const courseService = {
   },
 
   getCertificateById: async (id: string) => {
-    const { data } = await apiClient.post<{certificateUrl: string}>(`/course/${id}/certificate`);
-    return data;
+    // 1. Request generation
+    const { data } = await apiClient.post<any>(`/course/${id}/certificate`);
+    
+    // 2. Fix the URL before returning to component
+    // If the URL is relative (starts with /), prepend the backend host
+    let certUrl = data.certificate.certificateUrl;
+    if (certUrl && certUrl.startsWith('/')) {
+      certUrl = `${getBaseUrl()}${certUrl}`;
+    }
+
+    return {
+      ...data.certificate,
+      certificateUrl: certUrl
+    };
   },
 
   getResumePoint: async (courseId: string) => {

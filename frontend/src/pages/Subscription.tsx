@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -11,10 +10,14 @@ import {
   Sparkles,
   MessageSquare
 } from 'lucide-react';
-import { USER_DATA } from '../data/mockData';
 import { cn } from '../lib/utils';
+import { useAuthStore } from '../store/useAuthStore';
 
-const TIERS = [
+const Subscription = () => {
+  const navigate = useNavigate();
+    const { user } = useAuthStore();
+
+    const TIERS = [
   {
     id: 'basic',
     name: 'Basic',
@@ -30,7 +33,7 @@ const TIERS = [
     },
     color: 'border-border',
     buttonText: 'Current Plan',
-    isCurrent: USER_DATA.student_subscription_tier === 'basic'
+    isCurrent: user?.student_subscription_tier === 'basic'
   },
   {
     id: 'pro',
@@ -49,7 +52,7 @@ const TIERS = [
     color: 'border-secondary',
     highlight: true,
     buttonText: 'Current Plan',
-    isCurrent: USER_DATA.student_subscription_tier === 'pro'
+    isCurrent: user?.student_subscription_tier === 'pro'
   },
   {
     id: 'premium',
@@ -67,7 +70,7 @@ const TIERS = [
     },
     color: 'border-accent',
     buttonText: 'Upgrade to Premium',
-    isCurrent: USER_DATA.student_subscription_tier === 'premium'
+    isCurrent: user?.student_subscription_tier === 'premium'
   }
 ];
 
@@ -79,9 +82,7 @@ const FEATURE_LIST = [
   { key: 'revision', label: 'AI Revision Sheets', icon: Sparkles },
   { key: 'support', label: 'Live Human Doubt Support', icon: MessageSquare },
 ];
-
-const Subscription = () => {
-  const navigate = useNavigate();
+  
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

@@ -25,7 +25,7 @@ export interface StudentEntity {
   student_social_twitter?: string;
 
   student_stats: StudentStats;
-  student_enrolled_courses: string[];
+  student_enrolled_courses: (string | { course_id: string; progress_percent?: number; is_completed?: boolean })[];
   student_learning_progress: Record<string, {
     last_accessed_module_id: string;
     last_timestamp_seconds: number;
