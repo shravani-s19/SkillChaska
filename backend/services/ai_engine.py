@@ -3,7 +3,7 @@ import json
 import time
 import PyPDF2
 from gtts import gTTS
-from moviepy.editor import AudioFileClip, ImageClip, CompositeVideoClip
+from moviepy import AudioFileClip, ImageClip, CompositeVideoClip
 from weasyprint import HTML
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
