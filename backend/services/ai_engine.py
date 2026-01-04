@@ -203,11 +203,11 @@ class AIEngine:
             prompt = """
             Analyze this video. Return a JSON dictionary:
             {
-                "interaction_points": [{"timestamp": "MM:SS", "question": "...", "options": ["..."], "answer": "..."}],
+                "interaction_points": [{"formatted_time": "MM:SS", "note_id": 1, "note_text": "Note text", "timestamp_seconds": 0}],
                 "ai_materials": {
-                    "ai_smart_notes": ["Point 1", "Point 2"],
-                    "ai_flashcards": ["Front | Back"],
-                    "ai_mind_map": {"label": "Root", "nodes": []}
+                    "ai_smart_notes": [{"formatted_time": "00:00", "note_id": "unique_id", "note_text": "Note Text", "timestamp_seconds": 0}],
+                    "ai_flashcards": [{"front_text": "Front Text", "back_text": "Back Text", "card_id": "unique_id"}, ...],
+                    "ai_mind_map": {"id": "root", "label": "Topic", "children": [...]},
                 }
             }
             """

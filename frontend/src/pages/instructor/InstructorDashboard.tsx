@@ -58,7 +58,7 @@ const InstructorDashboard = () => {
       className="space-y-8"
     >
       {/* ... Header Section (Same as original) ... */}
-       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+       <div className="flex min-w-[100dvw] flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h1 className="text-3xl font-bold text-text">Dashboard</h1>
             <p className="text-textSecondary mt-1">Overview of your performance and content.</p>

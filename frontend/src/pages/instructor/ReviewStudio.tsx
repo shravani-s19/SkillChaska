@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { instructorService } from '../../services/instructor.service';
-import { CourseEntity, ModuleEntity } from '../../types';
-import { Play, Save, Brain, List, FileText, Layers, Video } from 'lucide-react';
+import { ModuleEntity } from '../../types';
+import { Save, Brain, FileText, Video } from 'lucide-react';
 import { motion } from 'framer-motion';
-
-// Import the MindMapRenderer we defined previously or in the component file
-// Ensure MindMapNode type is imported from types
 
 const ReviewStudio = () => {
   const { courseId, moduleId } = useParams();
   const navigate = useNavigate();
   const [module, setModule] = useState<ModuleEntity | null>(null);
-  const [activeTab, setActiveTab] = useState<'quizzes' | 'mindmap' | 'flashcards' | 'notes'>('mindmap');
-  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'mindmap' | 'notes'>('mindmap');
   const [videoUrl, setVideoUrl] = useState('');
 
   // Fetch Real Data
@@ -26,10 +22,12 @@ const ReviewStudio = () => {
             if (foundModule) {
                 setModule(foundModule);
                 
-                // Handle Video URL (If relative from backend, prepend base URL)
+                // Handle Video URL
+                // Backend returns relative path (e.g. /media/...) or full cloud URL
                 let vUrl = foundModule.module_media_url;
                 if (vUrl && vUrl.startsWith('/')) {
-                   vUrl = `http://localhost:5000${vUrl}`; // Or use env variable
+                   // Prepend Backend Host for localhost development
+                   vUrl = `http://localhost:5000${vUrl}`; 
                 }
                 setVideoUrl(vUrl);
             }
@@ -41,9 +39,6 @@ const ReviewStudio = () => {
   if (!module) return <div className="p-8 text-text">Loading Module Data...</div>;
 
   // Extract Materials safely
-  // The backend stores them in 'module_ai_materials'.
-  // Depending on your schema updates, it might be nested or direct. 
-  // Based on models.py: module['module_ai_materials']
   const materials = module.module_ai_materials || {};
   const mindMap = materials.ai_mind_map;
   const notes = materials.ai_smart_notes || [];
@@ -53,7 +48,7 @@ const ReviewStudio = () => {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-8rem)] flex flex-col gap-6">
       
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex min-w-[82dvw] justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-text">Review Studio</h1>
           <p className="text-textSecondary text-sm">Reviewing: <span className="text-primary font-medium">{module.module_title}</span></p>
@@ -88,14 +83,16 @@ const ReviewStudio = () => {
           {/* Timeline / Interactions Preview */}
           <div className="bg-surface border border-border rounded-xl p-4">
             <h4 className="font-bold text-sm mb-3">AI Interaction Points ({interactions.length})</h4>
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                 {interactions.map((point, idx) => (
                     <div key={idx} className="flex-shrink-0 px-3 py-2 bg-background border border-border rounded-lg text-xs">
                         <span className="font-bold text-secondary block">{point.interaction_timestamp_seconds}s</span>
-                        <span className="text-textSecondary truncate max-w-[150px] block">{point.interaction_question_text}</span>
+                        <span className="text-textSecondary truncate max-w-[150px] block" title={point.interaction_question_text}>
+                            {point.interaction_question_text}
+                        </span>
                     </div>
                 ))}
-                {interactions.length === 0 && <p className="text-xs text-textSecondary">No quizzes generated.</p>}
+                {interactions.length === 0 && <p className="text-xs text-textSecondary">No quizzes generated yet.</p>}
             </div>
           </div>
         </div>
@@ -124,12 +121,15 @@ const ReviewStudio = () => {
             {/* Mind Map */}
             {activeTab === 'mindmap' && (
               <div className="h-full flex flex-col items-center">
-                {mindMap ? (
+                {mindMap && mindMap.label ? (
                     <div className="w-full overflow-auto">
                         <MindMapRenderer node={mindMap} />
                     </div>
                 ) : (
-                    <p className="text-textSecondary text-sm mt-10">No Mind Map Generated</p>
+                    <div className="text-center mt-10">
+                        <Brain size={40} className="mx-auto text-textSecondary mb-2 opacity-50"/>
+                        <p className="text-textSecondary text-sm">No Mind Map Generated</p>
+                    </div>
                 )}
               </div>
             )}
@@ -143,7 +143,10 @@ const ReviewStudio = () => {
                            <p className="text-textSecondary">{note.note_text}</p>
                        </div>
                    )) : (
-                       <p className="text-textSecondary text-sm mt-10 text-center">No Notes Generated</p>
+                       <div className="text-center mt-10">
+                           <FileText size={40} className="mx-auto text-textSecondary mb-2 opacity-50"/>
+                           <p className="text-textSecondary text-sm">No Notes Generated</p>
+                       </div>
                    )}
                </div>
             )}
