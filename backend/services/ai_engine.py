@@ -1,247 +1,242 @@
-import google.generativeai as genai
 import os
 import json
 import time
 import PyPDF2
 from gtts import gTTS
-from moviepy.editor import AudioFileClip, ColorClip, TextClip, CompositeVideoClip
+from moviepy.editor import AudioFileClip, ImageClip, CompositeVideoClip
+from weasyprint import HTML
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 from core.config import Config
 from core.db_manager import DatabaseManager
-from core.file_handler import upload_file_to_cloud
+from core.local_file_handler import save_file_locally
+from google import genai
+from google.genai import types
 
+# Use the new SDK's client
+client = genai.Client(api_key=Config.GEMINI_API_KEY)
 db = DatabaseManager()
-genai.configure(api_key=Config.GEMINI_API_KEY)
 
 class AIEngine:
     def __init__(self):
-        # Using 1.5 Flash as it is optimized for speed/cost. 
-        # If 'gemini-3' becomes available/required, change here.
-        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        # Using stable 1.5 flash for guaranteed schema adherence
+        self.model_id = 'gemini-3-flash-preview'
 
-    def process_content_background(self, course_id, module_id, local_file_path, file_type, mime_type):
+    def _safe_json_loads(self, text):
         """
-        Master Controller: Handles both raw video uploads and document-to-video conversions.
+        Robustly parses JSON from AI response, handling markdown backticks
+        and unexpected list-wrapping.
         """
-        temp_generated_video = None
-        
+        # Remove markdown backticks if present
+        cleaned_text = text.strip().replace("```json", "").replace("```", "").strip()
         try:
+            data = json.loads(cleaned_text)
+            # If AI wrapped the object in a list, extract the first element
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]
+            return data
+        except (json.JSONDecodeError, IndexError) as e:
+            print(f"JSON Parsing Error: {e} | Raw Text: {text[:100]}")
+            return {}
+
+    # --- MASTER CONTROLLER ---
+    def process_content_background(self, course_id, module_id, local_file_path, original_filename, mime_type):
+        temp_files_to_delete = []
+        try:
+            print(local_file_path, original_filename, mime_type)
             # --- PATH A: User Uploaded a Video ---
             if "video" in mime_type:
-                # 1. Upload Original Video to Cloud
-                db.update_module_status(course_id, module_id, "Uploading Video to Cloud...", 10)
-                storage_path = f"courses/{course_id}/modules/{module_id}_{os.path.basename(local_file_path)}"
-                public_url = upload_file_to_cloud(local_file_path, storage_path, mime_type)
-                db.update_module_video_url(course_id, module_id, public_url)
+                db.update_module_status(course_id, module_id, "Saving Video Locally...", 10)
+                relative_url_path = save_file_locally(local_file_path, course_id, module_id, original_filename)
+                
+                # Using 127.0.0.1 for local testing, update to your specific IP if needed
+                full_url = f"http://127.0.0.1:5000{relative_url_path}"
+                db.update_module_video_url(course_id, module_id, full_url)
+                
+                final_local_path = os.path.join(os.getcwd(), 'media_storage', course_id, module_id, original_filename)
+                self._analyze_video_logic(course_id, module_id, final_local_path)
 
-                # 2. Analyze
-                self._analyze_video_logic(course_id, module_id, local_file_path)
-
-            # --- PATH B: User Uploaded a Document (PDF/Text) ---
+            # --- PATH B: User Uploaded a Document ---
             elif "pdf" in mime_type or "text" in mime_type or "application" in mime_type:
-                db.update_module_status(course_id, module_id, "Reading Document...", 10)
+                db.update_module_status(course_id, module_id, "Analyzing Document Content...", 15)
+                html_content, script_text = self._generate_html_and_script_from_doc(local_file_path)
                 
-                # 1. Convert Doc to Video (The "Creation" Phase)
-                temp_generated_video = self._convert_doc_to_video(course_id, module_id, local_file_path)
+                # 1. PDF Generation
+                pdf_path = self._create_pdf_from_html(html_content, module_id)
+                temp_files_to_delete.append(pdf_path)
+                save_file_locally(pdf_path, course_id, module_id, f"{module_id}_notes.pdf")
+
+                # 2. Video Generation
+                video_path = self._create_scrolling_video(html_content, script_text, course_id, module_id)
+                temp_files_to_delete.append(video_path)
                 
-                # 2. Upload the GENERATED Video to Cloud (So student sees a video, not pdf)
-                db.update_module_status(course_id, module_id, "Uploading Generated Lecture...", 40)
-                storage_path = f"courses/{course_id}/modules/{module_id}_lecture.mp4"
-                public_url = upload_file_to_cloud(temp_generated_video, storage_path, "video/mp4")
-                db.update_module_video_url(course_id, module_id, public_url)
-
-                # 3. Analyze the GENERATED Video (The "Analysis" Phase)
-                # We recurse the logic using the new video file
-                self._analyze_video_logic(course_id, module_id, temp_generated_video)
-
-            else:
-                db.update_module_status(course_id, module_id, "Unsupported file format.", 0)
+                relative_v_path = save_file_locally(video_path, course_id, module_id, f"{module_id}_lecture.mp4")
+                full_video_url = f"http://127.0.0.1:5000{relative_v_path}"
+                db.update_module_video_url(course_id, module_id, full_video_url)
+                
+                final_video_path = os.path.join(os.getcwd(), 'media_storage', course_id, module_id, f"{module_id}_lecture.mp4")
+                self._analyze_video_logic(course_id, module_id, final_video_path)
 
         except Exception as e:
             print(f"❌ Processing Error: {e}")
             db.update_module_status(course_id, module_id, f"Error: {str(e)}", 0)
-        
         finally:
-            # Cleanup
             if os.path.exists(local_file_path):
                 os.remove(local_file_path)
-            if temp_generated_video and os.path.exists(temp_generated_video):
-                os.remove(temp_generated_video)
+            for f in temp_files_to_delete:
+                if f and os.path.exists(f):
+                    os.remove(f)
 
-    # --- SUB-ROUTINE: Document to Video Converter ---
-    def _convert_doc_to_video(self, course_id, module_id, doc_path):
-        """
-        Extracts text -> TTS Audio -> Static Video MP4
-        """
-        text_content = ""
-        
-        # 1. Extract Text
+    # --- DOCUMENT PROCESSING SUB-ROUTINES ---
+    def _generate_html_and_script_from_doc(self, doc_path):
+        text = ""
         if doc_path.endswith('.pdf'):
             with open(doc_path, 'rb') as f:
                 reader = PyPDF2.PdfReader(f)
-                for page in reader.pages:
-                    text_content += page.extract_text() + " "
+                for page in reader.pages: text += page.extract_text() + " "
         else:
-            # Assume text file
             with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:
-                text_content = f.read()
+                text = f.read()
 
-        # Limit text for TTS demo (Google TTS has limits, simple implementation)
-        # In prod, use Gemini to summarize text first into a "Script"
-        summary_prompt = f"Summarize this document into a clear lecture script for students. Keep it under 500 words:\n\n{text_content[:5000]}"
-        script_response = self.model.generate_content(summary_prompt)
-        script_text = script_response.text
+        prompt = f"""
+        Analyze this document text. Generate a JSON dictionary with two keys:
+        1. "html_content": A styled Tailwind CSS HTML document explaining the topics.
+        2. "spoken_script": A clear, educational voiceover script.
+        TEXT: {text[:7000]}
+        """
+        response = client.models.generate_content(
+            model=self.model_id, 
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type='application/json')
+        )
+        data = self._safe_json_loads(response.text)
+        return data.get('html_content', '<h1>No Content</h1>'), data.get('spoken_script', 'No script generated.')
 
-        # 2. Generate Audio (TTS)
-        db.update_module_status(course_id, module_id, "Generating Audio Lecture...", 20)
+    def _create_pdf_from_html(self, html_content, module_id):
+        pdf_path = f"temp_{module_id}_notes.pdf"
+        HTML(string=html_content).write_pdf(pdf_path)
+        return pdf_path
+
+    def _create_scrolling_video(self, html_content, script_text, course_id, module_id):
+        db.update_module_status(course_id, module_id, "Generating Audio...", 40)
         tts = gTTS(text=script_text, lang='en')
-        temp_audio = f"temp_audio_{module_id}.mp3"
-        tts.save(temp_audio)
-
-        # 3. Create Video (MoviePy)
-        db.update_module_status(course_id, module_id, "Rendering Video...", 30)
-        
-        # Load Audio
-        audio_clip = AudioFileClip(temp_audio)
+        audio_path = f"temp_{module_id}.mp3"
+        tts.save(audio_path)
+        audio_clip = AudioFileClip(audio_path)
         duration = audio_clip.duration
-        
-        # Create Background (Black Screen or Simple Color)
-        # 1280x720 (720p)
-        video_clip = ColorClip(size=(1280, 720), color=(59, 29, 99), duration=duration) # Dark Purple bg
-        video_clip = video_clip.set_audio(audio_clip)
-        
-        # Output Path
-        output_video_path = f"temp_video_{module_id}.mp4"
-        
-        # Write File (24fps is enough for slides)
-        video_clip.write_videofile(output_video_path, fps=24, codec="libx264", audio_codec="aac")
 
-        # Cleanup Audio
-        audio_clip.close()
-        if os.path.exists(temp_audio):
-            os.remove(temp_audio)
+        db.update_module_status(course_id, module_id, "Rendering Video Frames...", 50)
+        html_path = f"temp_{module_id}.html"
+        image_path = f"temp_{module_id}.png"
+        with open(html_path, "w", encoding="utf-8") as f: f.write(html_content)
+        
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--window-size=1280,3000') # Tall window for scrolling content
+        
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+        driver.get(f"file:///{os.path.abspath(html_path)}")
+        time.sleep(2)
+        driver.save_screenshot(image_path)
+        driver.quit()
 
-        return output_video_path
+        db.update_module_status(course_id, module_id, "Animating Lecture...", 60)
+        image_clip = ImageClip(image_path).set_duration(duration)
+        img_width, img_height = image_clip.size
+        
+        def scroll(get_frame, t):
+            # Slow scroll from top to bottom based on audio duration
+            y_pos = -int((img_height - 720) * (t / duration))
+            return get_frame(t)[y_pos : y_pos + 720, :]
 
-    # --- SUB-ROUTINE: Video Analysis (The Core) ---
+        scrolling_clip = image_clip.fl(scroll, apply_to=['mask'])
+        final_clip = CompositeVideoClip([scrolling_clip.set_position(('center', 'top'))], size=(1280, 720))
+        final_clip = final_clip.set_audio(audio_clip)
+        
+        video_path = f"temp_{module_id}_lecture.mp4"
+        final_clip.write_videofile(video_path, fps=24, codec="libx264")
+
+        # Cleanup artifacts
+        for p in [html_path, image_path, audio_path]:
+            if os.path.exists(p): os.remove(p)
+            
+        return video_path
+    
+    # --- VIDEO ANALYSIS SUB-ROUTINE ---
     def _analyze_video_logic(self, course_id, module_id, video_path):
         gemini_file = None
         try:
-            db.update_module_status(course_id, module_id, "AI watching video...", 50)
+            # 1. Upload Phase
+            db.update_module_status(course_id, module_id, "Uploading Video to AI...", 70)
+            print(f"Starting upload for: {video_path}")
             
-            # 1. Upload to Gemini
-            gemini_file = genai.upload_file(path=video_path)
+            gemini_file = client.files.upload(file=video_path)
+            print(f"Upload complete. Gemini File Name: {gemini_file.name}")
             
+            # 2. Processing Wait Phase (The "Stuck" Fix)
+            db.update_module_status(course_id, module_id, "Waiting for AI Processing...", 75)
+            
+            # Set a timeout (e.g., 5 minutes = 300 seconds)
+            timeout = 300
+            start_time = time.time()
+
             while gemini_file.state.name == "PROCESSING":
-                time.sleep(2)
-                gemini_file = genai.get_file(gemini_file.name)
+                elapsed_time = time.time() - start_time
+                if elapsed_time > timeout:
+                    raise TimeoutError("Video processing timed out on Google's side.")
+                
+                print(f"Video is processing... ({int(elapsed_time)}s elapsed)")
+                time.sleep(5)  # Wait 5 seconds between checks to be polite to the API
+                gemini_file = client.files.get(name=gemini_file.name)
+            
+            # 3. Validation Phase
+            if gemini_file.state.name != "ACTIVE":
+                raise ValueError(f"Video failed to process. Final State: {gemini_file.state.name}")
+            
+            print("Video is ACTIVE. Generating AI analysis...")
 
-            if gemini_file.state.name == "FAILED":
-                raise ValueError("AI failed to read video.")
-
-            # 2. Generate Content
-            db.update_module_status(course_id, module_id, "Generating Interactive Content...", 75)
+            # 4. Content Generation Phase
+            db.update_module_status(course_id, module_id, "Generating Quizzes & Materials...", 85)
             
             prompt = """
-            Act as an expert course creator. Analyze this video content deeply.
-            
-            I need a comprehensive JSON output.
-            
-            1. **Interaction Points**: Create 3-5 timestamps where the video should PAUSE for a Multiple Choice Question.
-            2. **Smart Notes**: Summarize key concepts with timestamps.
-            3. **Flashcards**: Create 5 definitions from the video.
-            4. **Mind Map**: Create a hierarchical structure of the topics covered.
-
-            RETURN ONLY RAW JSON (No markdown blocks). Structure:
+            Analyze this video. Return a JSON dictionary:
             {
-                "interaction_points": [
-                    { 
-                        "interaction_timestamp_seconds": 15, 
-                        "interaction_type": "quiz_mcq", 
-                        "interaction_question_text": "...", 
-                        "interaction_options_list": ["A", "B", "C", "D"], 
-                        "interaction_correct_option": "A", 
-                        "interaction_hint_text": "..." 
-                    }
-                ],
+                "interaction_points": [{"timestamp": "MM:SS", "question": "...", "options": ["..."], "answer": "..."}],
                 "ai_materials": {
-                    "ai_smart_notes": [
-                        { "note_id": "n1", "timestamp_seconds": 10, "formatted_time": "00:10", "note_text": "..." }
-                    ],
-                    "ai_flashcards": [
-                        { "card_id": "fc1", "front_text": "...", "back_text": "..." }
-                    ],
-                    "ai_mind_map": {
-                        "id": "root", "label": "Main Topic", "children": [
-                            { "id": "c1", "label": "Subtopic", "children": [] }
-                        ]
-                    }
+                    "ai_smart_notes": ["Point 1", "Point 2"],
+                    "ai_flashcards": ["Front | Back"],
+                    "ai_mind_map": {"label": "Root", "nodes": []}
                 }
             }
             """
             
-            response = self.model.generate_content([gemini_file, prompt])
+            # Note: For video analysis, setting a slightly higher timeout for the generation request is wise
+            response = client.models.generate_content(
+                model=self.model_id,
+                contents=[gemini_file, prompt],
+                config=types.GenerateContentConfig(response_mime_type='application/json')
+            )
             
-            # 3. Clean & Parse
-            raw = response.text.replace("```json", "").replace("```", "").strip()
-            
-            try:
-                ai_data_full = json.loads(raw)
-            except json.JSONDecodeError:
-                # Fallback if AI adds extra text
-                start_idx = raw.find('{')
-                end_idx = raw.rfind('}') + 1
-                ai_data_full = json.loads(raw[start_idx:end_idx])
+            # Safe Load Logic
+            data = self._safe_json_loads(response.text)
 
-            interaction_points = ai_data_full.get("interaction_points", [])
-            ai_materials = ai_data_full.get("ai_materials", {})
+            interaction_points = data.get("interaction_points", [])
+            ai_materials = data.get("ai_materials", {})
 
-            # 4. Save to DB
             db.update_module_ai_data(course_id, module_id, interaction_points, ai_materials)
             db.update_module_status(course_id, module_id, "Completed", 100)
-
-        finally:
-            if gemini_file:
-                genai.delete_file(gemini_file.name)
-
-    def ask_tutor(self, context, timestamp, query):
-        """
-        Answers a student's doubt based on the video context.
-        
-        Args:
-            context (str): The topic/title of the module (e.g. "While Loops").
-            timestamp (int): Current video time in seconds.
-            query (str): The student's question.
-        """
-        try:
-            # 1. Format timestamp for the AI (e.g., "2m 30s")
-            minutes = int(timestamp) // 60
-            seconds = int(timestamp) % 60
-            time_str = f"{minutes}m {seconds}s"
-
-            # 2. Construct the Persona and Prompt
-            prompt = f"""
-            You are an expert AI Coding Tutor on the 'SkillChaska' platform.
-            
-            Current Context:
-            - The student is watching a video lesson about: "{context}".
-            - The video is currently paused at: {time_str}.
-            
-            Student's Question: "{query}"
-            
-            Guidelines:
-            1. Answer the question clearly and concisely.
-            2. If the question is about "what is happening", explain the general concept of "{context}".
-            3. Use a helpful, encouraging tone.
-            4. If the question requires code, provide a short snippet.
-            5. Do NOT mention "I cannot see the video". Use the provided context to infer the topic.
-            """
-            
-            # 3. Call Gemini
-            response = self.model.generate_content(prompt)
-            
-            # 4. Return clean text
-            return response.text.strip()
+            print("AI Analysis Completed Successfully.")
             
         except Exception as e:
-            print(f"❌ AI Tutor Error: {e}")
-            return "I am currently overloaded with requests. Please try asking me again in a few seconds!"
+            print(f"❌ Video Analysis Error: {e}")
+            db.update_module_status(course_id, module_id, f"AI Error: {str(e)}", 0)
+        finally:
+            # Clean up the file from Google's servers to save storage/privacy
+            if gemini_file:
+                print(f"Deleting remote file: {gemini_file.name}")
+                try:
+                    client.files.delete(name=gemini_file.name)
+                except Exception as cleanup_error:
+                    print(f"Warning: Failed to cleanup remote file: {cleanup_error}")

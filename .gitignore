@@ -6,4 +6,5 @@ __pycache__/
 code_context.txt
 dist/
 build/
-sctipts/
+scripts/
+media_storage/

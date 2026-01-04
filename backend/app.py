@@ -7,6 +7,7 @@ from routes.learn_routes import learn_bp
 from routes.instructor_routes import instructor_bp
 from routes.ai_routes import ai_bp
 from routes.achievement_routes import achievement_bp
+from routes.media_routes import media_bp
 
 def create_app():
     app = Flask(__name__)
